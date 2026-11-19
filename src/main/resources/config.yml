@@ -1,0 +1,1076 @@
+# ------------------------------------------------------------------------------
+#  VA+ anticheat - main configuration
+#  /ac reload applies changes. Durations are milliseconds unless noted.
+# ------------------------------------------------------------------------------
+config-version: 1
+
+alerts:
+  # Staff with ac.alerts receive alerts automatically after joining.
+  enable-on-join: true
+  # Mirror alerts to the server console.
+  console: true
+  # Minimum time between two alerts of the same check for the same player (0 = every violation).
+  min-interval: 0
+
+latency:
+  # Interval of the latency heartbeat (ping/pong markers). Lower values tighten the latency
+  # compensation at a small bandwidth cost. Minimum 10.
+  heartbeat-interval: 50
+  # Players that leave a marker unanswered for this long are disconnected. Clients that withhold
+  # responses could otherwise freeze the latency compensation. Range 5000-120000; 15000 matches
+  # vanilla's keep-alive timeout.
+  ack-timeout: 15000
+  # Send one extra marker at the end of every server tick so client acknowledgements can be mapped
+  # to server ticks (used by the movement engine). Roughly 20 small packets per second per player.
+  server-tick-markers: true
+
+setback:
+  # Pull players back to their last legitimate position when a movement check fails.
+  enabled: true
+  # Minimum time between two setbacks of the same player.
+  cooldown: 250
+  # A single violation spike must not rubber-band a player: the check has to produce this many
+  # violations inside the window below before a setback is issued (1-8). Range 1 = old behaviour.
+  confirmations: 2
+  # Window for "confirmations", in milliseconds.
+  window: 4000
+
+profiling:
+  # Measures check cost for /ac profile (adds two clock reads per check call).
+  enabled: true
+
+logging:
+  # Violations kept in memory per player for /ac logs. Changes require a restart.
+  memory-per-player: 200
+  memory-max-players: 500
+
+# Durable violation log (all settings require a restart). The in-memory log above stays the cache of
+# the current session. JDBC drivers are not bundled: SQLite and MySQL drivers ship with most Paper
+# builds; when a driver is missing the plugin logs one warning and keeps violations in memory only.
+storage:
+  # memory, sqlite or mysql (mariadb is an alias of mysql)
+  type: sqlite
+  # SQLite file, relative to the plugin folder
+  file: violations.db
+  # MySQL/MariaDB only: jdbc:mysql://host:3306/db or jdbc:mariadb://host:3306/db
+  url: ""
+  user: ""
+  password: ""
+  # Records older than this many days are deleted on startup and daily; 0 keeps everything.
+  retention-days: 30
+  # Pending writes kept in memory before the oldest is dropped; records written per transaction.
+  queue-size: 10000
+  batch-size: 200
+
+# Anti health indicator: rewrites outgoing packets so cheat clients cannot read information vanilla
+# does not display (health bars / target HUDs, armor durability, exact absorption, ...). The real
+# values never leave the server; vanilla players see no difference. Exempt: the player's own entity,
+# the vehicle the player rides (its health bar stays correct), wolves, withers and the ender dragon.
+# Players with ac.healthindicator.bypass receive the real data. /ac reload applies changes.
+anti-health-indicator:
+  enabled: true
+  # Only rewrite other players; mobs keep their real health.
+  players-only: false
+  health:
+    enabled: true
+    # Health sent instead of the real value (1-1024). Dead entities keep 0 for the death animation.
+    # Iron golems keep their crack stage (visible in vanilla) but not their exact health.
+    spoof-value: 20
+    # Send a random value between 1 and spoof-value instead of a fixed one.
+    randomize: true
+  # Hide the absorption hearts of other players.
+  absorption: true
+  # Hide the score (experience) of other players.
+  experience: true
+  # Show other entities with full air.
+  air-ticks: true
+  items:
+    enabled: true
+    # Show stacks held by others with an amount of 1.
+    stack-amount: true
+    # Show armor and tools of others undamaged (broken elytras stay broken).
+    durability: true
+    # Hide the enchantments of others' equipment; the enchantment glint stays visible.
+    enchantments: true
+  # Show other players as survival in the tab list (spectators stay spectators).
+  gamemode: true
+  # Hide values of scoreboard objectives rendered as hearts (tab list health).
+  hearts-scoreboard: true
+  # Hide the player's own food saturation (shown by client mods only).
+  food-saturation: false
+
+# Master switches per category.
+categories:
+  movement:
+    enabled: true
+  combat:
+    enabled: true
+  packet:
+    enabled: true
+  world:
+    enabled: true
+  inventory:
+    enabled: true
+
+# Punishment profiles referenced by checks ("profile: <name>"). Every entry fires once when the
+# violation level reaches "vl"; with "repeat" > 0 it fires again every "repeat" levels above.
+#
+# Actions:
+#   kick                     disconnect with kick-message from messages.yml
+#   kick: <message>          disconnect with a custom MiniMessage text
+#   cmd: <console command>   run a console command (e.g. your ban plugin)
+#   notify                   send staff-notice from messages.yml to staff with alerts enabled
+#   notify: <message>        send a custom MiniMessage line to staff
+# Placeholders: %player% %uuid% %check% %check_id% %category% %vl% %count% %ping% %version% %details%
+punishment-profiles:
+  # Packet-level checks never punish by default: an impossible packet is usually a glitch and the
+  # detection itself is the value (see checks.badpackets).
+  packet: []
+  world: []
+  movement:
+    - vl: 40
+      repeat: 20
+      run: [notify]
+    - vl: 100
+      run: [kick]
+  combat:
+    - vl: 20
+      repeat: 10
+      run: [notify]
+    - vl: 50
+      run: [kick]
+  packet:
+    - vl: 10
+      run: [kick]
+  world:
+    - vl: 30
+      repeat: 15
+      run: [notify]
+    - vl: 80
+      run: [kick]
+  inventory:
+    - vl: 30
+      repeat: 15
+      run: [notify]
+    - vl: 80
+      run: [kick]
+  alerts-only: []
+
+# Per-check settings. Every key is optional; missing keys use the check's built-in defaults.
+#
+#   <check-id>:
+#     enabled: true
+#     buffer:
+#       limit: 2.0          # buffer must exceed this before a violation is registered
+#       decay: 0.05         # removed from the buffer on legitimate behaviour
+#       max: 8.0            # buffer cap (0 = none)
+#     vl-decay-per-minute: 6.0
+#     alert-vl: 1.0         # alerts are sent from this violation level on
+#     setback-vl: 1.0       # movement checks set back from this level on (-1 = never)
+#     profile: movement     # punishment profile, or an inline "actions:" list in profile format
+#     options: {}           # check-specific tuning values
+#
+# Optional option on every check: "log-only: true" runs the check in shadow mode - it keeps
+# alerting and logging but executes no setbacks or configured punishments. Use it to measure the
+# false-positive rate of a new check (see also /ac metrics).
+#
+# Movement checks (speed, fly, nofall) only judge packets the movement simulation could explain
+# (status COMPLETE). Their thresholds are added on top of the simulation's own uncertainty and are
+# tuning values, not vanilla constants: raise them if legitimate players are flagged.
+#
+# Visibility checks (xray, freecam, esp) need mirrored world data: they stay silent for blocks the
+# client was never sent, so they simply do less on incomplete chunks instead of guessing. xray and
+# esp are heuristic and marked experimental; freecam is a geometry test (look direction vs. target)
+# and needs no world data at all.
+checks:
+  speed:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 10.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 1.0
+    profile: movement
+    options:
+      # Horizontal offset (blocks per position packet) tolerated beyond the simulation uncertainty.
+      threshold: 0.03
+      # Do not count movement that is clearly slower than the prediction (unmodelled obstacles).
+      ignore-slowdown: true
+  fly:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 10.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 1.0
+    profile: movement
+    options:
+      # Tolerated vertical offset when the player ends higher than predicted (hover, glide, ascend).
+      upward-threshold: 0.03
+      # Also judge ending lower than predicted (fast-fall), with its own tolerance.
+      check-downward: true
+      downward-threshold: 0.1
+  nofall:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 1.0
+    profile: movement
+    options:
+      # The predicted ground state is only trusted while the total offset stays below this value.
+      max-offset: 0.1
+      # Also flag claiming to be airborne while the simulation predicts ground contact.
+      flag-missing-ground: false
+  prediction:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 2.0
+    profile: movement
+    options:
+      # Blocks of accumulated position error before the check counts (tuning value).
+      cumulative-threshold: 0.15
+      # Chains shorter than this many client ticks are not judged.
+      min-ticks: 5
+  xray:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Ores that count as valuable. "minecraft:" may be omitted; an empty list restores the defaults.
+      valuable-blocks:
+        - diamond_ore
+        - deepslate_diamond_ore
+        - emerald_ore
+        - deepslate_emerald_ore
+        - ancient_debris
+        - gold_ore
+        - deepslate_gold_ore
+        - nether_gold_ore
+        - lapis_ore
+        - deepslate_lapis_ore
+        - redstone_ore
+        - deepslate_redstone_ore
+      # Only count ores whose six neighbours are all opaque (invisible without X-Ray). With false,
+      # every mined ore from the list counts, which flags normal mining much sooner.
+      only-hidden: true
+      # Prevention (engine mode): fully enclosed ores are replaced by fake-block in the chunk packet,
+      # so an X-Ray client never receives them. The detection above still reads the real world.
+      # "minecraft:" may be omitted. Set to false to keep the packet untouched.
+      obfuscate: true
+      # Block the client sees instead of a hidden ore. stone matches vanilla deepslate-adjacent looks
+      # wrong, deepslate matches the deep layers; either is fine, no ore information leaks.
+      fake-block: stone
+      # Safety valve: at most this many blocks are rewritten per chunk (<= 0 disables rewriting).
+      max-per-chunk: 512
+  freecam:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Block interaction range tolerated. Vanilla survival reach is 4.5; this leaves latency slack.
+      max-reach: 6.0
+      # Largest angle (degrees) between the sent look direction and the placement hit point.
+      max-angle: 25.0
+      # Grows the targeted block box to absorb float rounding and the eye-height approximation.
+      ray-tolerance: 0.15
+      # Judge block placements and dig starts. Freecam that only looks around cannot be seen here.
+      check-place: true
+      check-dig: true
+  esp:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.05
+      max: 6.0
+    vl-decay-per-minute: 3.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Only players within this many blocks are considered.
+      max-distance: 48.0
+      # Allowed distance between the look ray and the hidden player's chest, plus a per-block slope.
+      max-miss-distance: 1.0
+      miss-per-block: 0.02
+      # How long (client ticks) the crosshair must stay on the hidden player ...
+      min-ticks: 20
+      # ... and how far that hidden player must move during that window.
+      min-target-movement: 2.0
+      # Evaluate every N client ticks (cost against reaction time).
+      interval: 2
+  # Combat checks judge attacks against entities the server actually sent to this viewer. Targets
+  # are player entities; a target the client cannot know about never produces a flag.
+  reach:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Vanilla survival reach is 3.0 blocks; this leaves latency and rounding slack.
+      max-reach: 3.1
+      # Grows the target hitbox (0.6 x 1.8) to absorb float rounding and the eye-height estimate.
+      hitbox-tolerance: 0.1
+  through-wall:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Closer targets are skipped: a wall cannot be between attacker and target.
+      min-distance: 1.5
+      # Farther targets are out of combat range anyway and increase mirror noise.
+      max-distance: 6.0
+  killaura:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Generous: 180 degree flicks exist, so the default needs several aligned samples.
+      max-angle: 75.0
+      max-distance: 6.0
+      # Attacks on two different entities inside one client tick (1.21.2+ clients only). A vanilla
+      # client picks its target once per tick, so this cannot happen without a multi-aura.
+      check-multi-target: true
+      # Attacking while eating / drinking / blocking / drawing a bow (vanilla drops those clicks):
+      # Multitask, AutoEat/AutoGap + aura. Judged only if the server still sees the same item use
+      # this many client ticks after the attack (eating may end on the client a moment earlier).
+      check-item-use: true
+      item-use-confirm-ticks: 3
+      # Attacking while a server-opened container screen is open (GuiMove + aura).
+      check-container: true
+      # Attack without the arm swing in the same client tick (1.21.2+ clients only): NoSwing,
+      # packet-only attacks, crystal auras with swing disabled.
+      check-no-swing: true
+  autoclicker:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Both conditions must hold: at least max-cps ...
+      max-cps: 16.0
+      # ... with a standard deviation below this value (milliseconds).
+      min-stddev-millis: 2.0
+      # Attacks needed before the statistics are trusted (<= 20).
+      min-samples: 12
+  # Triggerbot: judges only the first click after a pause. If that click lands within
+  # max-reaction-ticks of the crosshair provably reaching the target, it was faster than a human
+  # can react. Swings that miss close to the target are human evidence and pay the buffer back.
+  # Only 1.21.2+ clients are judged. Experimental: run with log-only before enforcing.
+  triggerbot:
+    enabled: true
+    buffer:
+      limit: 4.0
+      decay: 0.5
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # A click is "cold" when no swing happened for more than this many client ticks before it.
+      min-idle-ticks: 6
+      # Cold clicks at most this many ticks (50 ms each) after the target became hittable count.
+      max-reaction-ticks: 2
+      # How far back (client ticks) the look history is searched for the crosshair being off target.
+      lookback-ticks: 10
+      # Growth of the target hitbox (blocks) the look ray must miss to count as "off target".
+      off-margin: 0.25
+      # Buffer paid back per swing that misses close to the target.
+      miss-relief: 1.0
+      # Buffer weight of a fast cold click fired while the view keeps sweeping past the target.
+      sweep-weight: 1.5
+  # Protocol sanity: impossible rotations, cursors, dig sequences and packet rates. High precision,
+  # no game-mode exemption (a crafted packet is never legitimate).
+  badpackets:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 2.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      # Pitch must stay inside vanilla's [-90, 90] range.
+      check-pitch: true
+      # Placement hit point must lie inside the block box (0..1, small tolerance).
+      check-cursor: true
+      # FINISHED/CANCELLED digging without a matching start at the same position.
+      check-dig-sequence: true
+      # Sprinting and sneaking at the same time (the client stops one of them).
+      check-sprint-sneak: true
+      # Hotbar selection outside the nine hotbar slots (0..8).
+      check-held-slot: true
+      # Upper bound of movement packets per second (vanilla sends 20).
+      max-movement-packets-per-second: 60
+  # Game-speed hacks: every client tick advances a client clock by one tick length; a clock that
+  # overtakes real time means the client ticks too fast. Lag only delays packets and never flags.
+  # /tick rate changes are followed automatically.
+  timer:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.01
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      # How far (milliseconds) the client clock may lag behind the newest acknowledged marker before
+      # it is pulled forward. Larger values tolerate more jitter but let a client bank more ticks.
+      clock-drift-millis: 120.0
+  # FastPlace: placements per client tick (tick-end clients 1.21.2+ only). Holding right-click places
+  # every 4 ticks; long streaks, several placements per tick or more than 20/s are not human.
+  fastplace:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Flag when a placement on a new target happens in this many consecutive client ticks.
+      max-streak: 12
+      # Flag when this many distinct placements occur inside one client tick.
+      max-per-tick: 3
+      # Flag when more than this many placements occur within window-ticks ticks (20 ticks = 1 s).
+      max-per-window: 20
+      window-ticks: 20
+  # ChestStealer: shift-clicks out of a container (judged only after the open is acknowledged):
+  # first click too soon after opening, sustained bursts per tick, or a jitter-free cadence.
+  # Experimental; sorting/quick-move mods can look similar - run with log-only first.
+  cheststealer:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.25
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: inventory
+    options:
+      # First shift-click earlier than this many client ticks after the acknowledged open.
+      min-open-ticks: 2
+      # Burst: at least this many shift-clicks per tick for burst-ticks consecutive ticks.
+      max-moves-per-tick: 3
+      burst-ticks: 4
+      # Cadence: intervals needed, and the mean/stddev (client ticks) at or below which it counts.
+      min-samples: 10
+      max-mean-interval-ticks: 3.0
+      max-stddev-ticks: 0.55
+      # A longer pause (client ticks) resets the run.
+      max-gap-ticks: 10
+      # Share of strictly ascending slots that raises the cadence weight.
+      sequential-ratio: 0.8
+  # NoSlow: full movement speed while the server's own-entity "hand active" flag is confirmed
+  # (eating, drinking, bow, shield...). Judges only single-tick COMPLETE ground simulations whose best
+  # candidate is unslowed. Experimental: run with log-only before enforcing.
+  noslow:
+    enabled: true
+    buffer:
+      limit: 4.0
+      decay: 0.5
+      max: 10.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 2.0
+    profile: movement
+    options:
+      # Client ticks after the confirmed start of item use before movement is judged.
+      grace-ticks: 8
+      # Minimum horizontal speed (blocks per tick) to count; above the slowed maximum.
+      min-speed: 0.12
+      # Residual (blocks) the unslowed candidate may have on top of the engine uncertainty.
+      threshold: 0.02
+  # Hitbox: the attack's pick ray must intersect the target box (latency window, swept attacker eye,
+  # sampled look arc). Flags hits that need more than min-miss blocks of box growth. Experimental.
+  hitbox:
+    enabled: true
+    buffer:
+      limit: 4.0
+      decay: 0.5
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Box growth (blocks) within which a ray still counts as a plain hit (relieves the buffer). 0..0.5
+      tolerance: 0.1
+      # Needed box growth (blocks) above which a hit counts as impossible; between the two: ignored.
+      min-miss: 0.15
+      # Client-side interpolation of remote players in ticks, added to the latency window. 1..8
+      interpolation-ticks: 4
+      # View turn (degrees) between two client ticks above which the hit is not judged. Max 90
+      max-turn-degrees: 12.0
+  # Spider: rising along a wall (client-reported horizontal collision) faster than gravity allows,
+  # without a climbable, liquid or other lift source in the player's box. Experimental.
+  spider:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.25
+      max: 6.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: movement
+    options:
+      # Climb ticks within one airborne phase before the buffer is raised. 1..100
+      min-ticks: 3
+      # Blocks per tick the rise may exceed (previousDy - 0.08) * 0.98.
+      excess-tolerance: 0.04
+      # Smallest upward delta per tick that counts as rising.
+      min-rise: 0.01
+      # Height above the lowest point of the airborne phase before anything flags (a jump peaks at ~1.25).
+      min-height: 1.5
+      # Quiet ticks after a legit lift source was seen (climbable, liquid, effect, velocity, ...). 0..200
+      grace-ticks: 10
+  # Velocity (anti-knockback): the best simulated candidate that applies every acknowledged server
+  # velocity must explain the movement. Flags ignored or reduced knockback.
+  velocity:
+    enabled: true
+    buffer:
+      limit: 1.5
+      decay: 0.25
+      max: 4.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: movement
+    options:
+      # Offset (blocks) the knockback-honouring candidate may have on top of the engine uncertainty.
+      threshold: 0.04
+      # Velocities whose horizontal speed and |vertical| are both below this (blocks/tick) are not judged.
+      min-velocity: 0.1
+  # Scaffold: placements against a full-cube face the eye cannot see, or whose hit point is not on the
+  # clicked face. Only judged when the target is a mirrored full opaque cube. Experimental.
+  scaffold:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.1
+      max: 6.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Blocks the eye may be on the wrong side of the clicked face's plane. 0..1
+      tolerance: 0.05
+      # Distance of the hit point from the face plane tolerated. 0..0.5
+      cursor-tolerance: 0.02
+      check-face: true
+      check-cursor: true
+      # Ray: some look ray (eye between previous and current position, standing/crouching eye,
+      # rotation between the one sent before and the one sent after the placement) must cross the
+      # clicked face within ray-tolerance blocks of the hit point. Catches scaffolds that do not
+      # look where they place (no rotations, wrong silent rotations, expand).
+      check-ray: true
+      ray-tolerance: 0.25
+      # Reach: the clicked block is farther than the block_interaction_range attribute (4.5) plus
+      # reach-tolerance from every eye position.
+      check-reach: true
+      reach-tolerance: 0.3
+      # Air: clicking air or a pure fluid block (AirPlace). Own placements of the last 3 s are skipped.
+      check-air: true
+      # Snap (silent scaffold rotation): jump away >= snap-min-degrees, place, jump back within
+      # snap-hold-ticks to within max(snap-return-degrees, snap-return-ratio x jump) of the start.
+      check-snap: true
+      snap-min-degrees: 60.0
+      snap-hold-ticks: 3
+      snap-return-ratio: 0.1
+      snap-return-degrees: 5.0
+  # Phase: the (shrunk, 0.6 high) player box ends inside, or tunnels in one tick through, a mirrored
+  # full solid cube. Pending world windows and recent own digs/placements near the path are skipped.
+  phase:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 1.0
+    profile: movement
+    options:
+      # Blocks the box is shrunk by on every side (float noise, touching faces). 0..0.25
+      shrink: 0.05
+      # Buffer weight of ending a move inside a solid cube.
+      overlap-weight: 1.0
+      # Buffer weight of tunnelling through a solid cube in one tick.
+      sweep-weight: 2.0
+      # Own digs/placements near the path suppress judging this long (plus smoothed RTT). 0..60000
+      interaction-grace-millis: 3000
+      # Ticks after a dismount that are not judged. 0..1200
+      dismount-grace-ticks: 20
+      # Largest block volume scanned per packet for the sweep test. 64..65536
+      max-scan-blocks: 4096
+      check-sweep: true
+  # Crash protection: drops (cancels) packets that can only lag or crash the server - packet floods,
+  # oversized packets, impossible window clicks, oversized books and tab-complete requests.
+  crasher:
+    enabled: true
+    buffer:
+      limit: 0.0
+      decay: 0.0
+      max: 0.0
+    vl-decay-per-minute: 2.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      # Play packets per second; packets above it are dropped. 100..100000
+      max-packets-per-second: 600
+      # Largest packet body (bytes), books and creative item packets excepted. 32768..8388608
+      max-packet-bytes: 65536
+      # Highest window slot id accepted (-999 = outside, -1 = window border). 90..32767
+      max-window-slot: 255
+      max-book-pages: 100
+      max-book-page-length: 1024
+      max-book-title-length: 32
+      max-tab-complete-length: 2048
+  # Criticals: attacks during a faked take-off (packet crits / mini-jumps): an airborne claim right
+  # after ground that is lower than a jump and that the movement engine cannot explain. Experimental.
+  criticals:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.25
+      max: 8.0
+    vl-decay-per-minute: 3.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Largest lift above the floor (blocks) a faked take-off may reach (below the 0.42 jump).
+      max-lift: 0.4
+      # A fake take-off must stay this far below the first jump tick's height.
+      jump-margin: 0.02
+      # Vertical offset beyond which the engine's best candidate counts as unexplained.
+      vertical-tolerance: 0.01
+      # Largest horizontal engine offset at which its verdict is trusted.
+      max-offset: 0.1
+      # Airborne packets after the take-off that still belong to the crit hop. >= 1
+      max-episode-packets: 4
+      # Client ticks within which a second correlated attack counts as a pattern. >= 0
+      pattern-window: 40
+      # Extra buffer for a recurring pattern.
+      pattern-bonus: 0.5
+  # GhostHand: placing, using or starting to break a block through a wall of full opaque cubes.
+  # Unknown blocks, pending changes and own recent digs near the path are not judged. Experimental.
+  ghosthand:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.1
+      max: 6.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Own digs near the path suppress judging this long (plus smoothed RTT). 0..60000
+      dig-grace-millis: 1500
+      check-place: true
+      check-dig: true
+  # FastBreak / Nuker: two blocks started in one client tick, a finish in its own start tick, or a
+  # known-hardness block finished faster than the best legal tool allows. Tick-end clients only.
+  fastbreak:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.1
+      max: 6.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Best tool speed the server allows (35 = netherite pickaxe + Efficiency V). Raise for custom levels.
+      max-tool-speed: 35.0
+      # Ticks a finish may come earlier than the computed minimum. 0..20
+      tolerance-ticks: 1
+      check-nuker: true
+      check-speed: true
+  # Step: rising more than max(step_height, jump velocity) in one client tick from the ground without an
+  # impulse; packets of one tick are summed (packet step) for 1.21.2+ tick-end clients.
+  step:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.25
+      max: 4.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 1.0
+    profile: movement
+    options:
+      # Blocks tolerated above max(step height, jump velocity).
+      tolerance: 0.03
+      # Ticks a registered server velocity excuses the following airborne phase. 0..6000
+      velocity-window-ticks: 100
+      # Sum all position packets of one client tick (tick-end clients only).
+      check-packet-step: true
+  # Jesus: resting or walking on top of water/lava (feet at a liquid surface, plain liquid below, plain
+  # air above, no vertical motion) for longer than min-ticks. Experimental.
+  jesus:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.25
+      max: 10.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 1.0
+    profile: movement
+    options:
+      # Consecutive suspicious packets tolerated before the buffer rises. 2..1000
+      min-ticks: 8
+      # Largest |dy| of a resting tick.
+      flat-delta: 0.01
+      # Largest |dy| of a tick that claims onGround over a liquid.
+      ground-delta: 0.1
+      # Window around the block boundary that counts as the surface (below + above < 0.5).
+      surface-below: 0.15
+      surface-above: 0.05
+      # Margin beyond the 0.3 half width; solid blocks within it skip the tick. 0..0.2
+      box-margin: 0.05
+  # Vehicle: boat fly, vehicle speed and mount high jump from client-reported VEHICLE_MOVE. Boats are
+  # only speed-judged off slippery or unknown surfaces. Experimental.
+  vehicle:
+    enabled: true
+    buffer:
+      limit: 5.0
+      decay: 0.25
+      max: 10.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: movement
+    options:
+      # Boat blocks/tick (water/air terminal speed is 0.4).
+      max-boat-speed: 0.65
+      # Horses and other mounts, blocks/tick.
+      max-mount-speed: 1.2
+      # Vehicle packets after a slippery/unknown surface before boat speed is judged again. 0..1200
+      ice-grace-ticks: 40
+      # Free-air packets a boat may stay level or rise. 0..1200
+      max-hover-ticks: 24
+      # Blocks a boat may rise after leaving support.
+      max-air-rise: 8.0
+      # Blocks a horse may rise after leaving the ground.
+      max-jump-height: 6.5
+      # Vehicle packets after mounting that are not judged. 0..1200
+      mount-grace-ticks: 10
+      # Milliseconds (plus twice the RTT) after a server correction that are not judged.
+      sync-grace-millis: 1000.0
+      check-speed: true
+      check-hover: true
+      check-rise: true
+  # Mace: an attack right after a fake fall setup - a rise above max-rise within a few ticks, or a
+  # drop faster than terminal velocity (teleport up and back down for the smash bonus). Experimental.
+  mace:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.25
+      max: 4.0
+    vl-decay-per-minute: 3.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Blocks above the lowest position of the rise window (a jump peaks at 1.25).
+      max-rise: 2.0
+      rise-window-ticks: 5
+      # Blocks per packet tolerated above terminal velocity (3.92 per tick).
+      drop-tolerance: 0.5
+      # Ticks between the anomaly and the attack that still count.
+      suspect-ticks: 3
+      # Ticks after a server velocity (plus RTT) that are not judged.
+      velocity-grace-ticks: 25
+      # Rise limit and window after an item use (wind charge).
+      wind-charge-rise: 12.0
+      wind-charge-ticks: 40
+      # Rises at least this large count double.
+      huge-rise: 8.0
+      # Ticks after a rise from liquid, climbable or special blocks that are not judged.
+      environment-grace-ticks: 30
+  # Aim: rotations no mouse produces while fighting - rotating killauras, aim assists and crystal
+  # auras (Meteor's KillAura rotates by default, so the killaura angle test alone cannot see it).
+  # Vanilla turns the camera in whole steps of the mouse sensitivity grid; the grid is learnt from
+  # rotations outside fights and every rotation within combat-window ticks of an attack is tested
+  # against it. Experimental: zoom mods that change the sensitivity mid-fight, controllers and
+  # Bedrock/touch input have no grid (the check then stays silent or may need a higher min-off-grid).
+  aim:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.02
+      max: 6.0
+    vl-decay-per-minute: 3.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      check-gcd: true
+      # Client ticks before/after an attack that count as "fighting".
+      combat-window: 20
+      # Combat rotations per verdict, and how many of them must be off the grid.
+      sample-window: 20
+      min-off-grid: 8
+      off-grid-ratio: 0.5
+      # Distance from the nearest whole grid step (0..0.5) that counts as off-grid.
+      residual: 0.15
+      # Grids finer than this (sensitivity below ~10%) are not judged.
+      min-grid: 0.02
+      # Share of learnt rotations the grid must explain before it is trusted.
+      grid-support: 0.75
+      # Deltas larger than this many grid steps are skipped (float precision).
+      max-multiple: 150.0
+      # Lock: the sent rotation points at the exact hitbox centre of the target (within lock-degrees
+      # on yaw and pitch) in lock-min-attacks of the last lock-window attacks. Humans hit somewhere
+      # on the body; auras aim at the centre with atan2. Targets closer than lock-min-distance
+      # (horizontal blocks) are skipped.
+      check-lock: true
+      lock-degrees: 0.25
+      lock-window: 8
+      lock-min-attacks: 5
+      lock-min-distance: 1.5
+      # Snap (silent aura): the rotation jumps at least snap-min-degrees away, an attack happens, and
+      # within snap-hold-ticks it jumps back to within max(snap-return-degrees,
+      # snap-return-ratio x jump) of where it started - the camera never moved, only the packets.
+      check-snap: true
+      snap-min-degrees: 35.0
+      snap-hold-ticks: 10
+      snap-return-ratio: 0.15
+      snap-return-degrees: 4.0
+  # Post: attacks, swings, item use, placing, digging or slot changes sent after the movement packet
+  # of the same client tick (1.21.2+ clients). Vanilla handles input before it sends its movement;
+  # silent auras attack from a post-motion hook so the hit uses the aim rotation they just sent.
+  post:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.25
+      max: 6.0
+    vl-decay-per-minute: 2.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      check-attacks: true
+      check-swings: true
+      check-interactions: true
+      check-slot: true
+  # Blink / FakeLag (1.21.2+ clients): more than one movement packet in a single client tick (stored
+  # packets released at once), or no movement packet for max-silent-ticks ticks although vanilla
+  # sends one at least every 20 ticks.
+  blink:
+    enabled: true
+    buffer:
+      limit: 1.5
+      decay: 0.01
+      max: 6.0
+    vl-decay-per-minute: 2.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      check-burst: true
+      check-withheld: true
+      max-silent-ticks: 40
+  # Sprint (omni / rage sprint, 1.21.2+ clients): sprinting for min-ticks client ticks while the
+  # movement keys have no forward component. Vanilla stops sprinting in the same tick.
+  sprint:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.05
+      max: 6.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: movement
+    options:
+      min-ticks: 3
+  # Elytra: while the server-acknowledged gliding pose is active and the player is in known free air,
+  # hovering without movement or never descending for climb-ticks without a boost. Experimental.
+  elytra:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: movement
+    options:
+      # Consecutive near-motionless gliding ticks that flag. 5..1200
+      hover-ticks: 20
+      # Per-tick |dy| and horizontal distance that count as motionless.
+      hover-vertical: 0.005
+      hover-horizontal: 0.05
+      # Consecutive gliding ticks without descending that flag. 20..6000
+      climb-ticks: 100
+      # Ticks after an item use (rocket, wind charge, trident) or server velocity that are not judged.
+      boost-grace-ticks: 80
+  # InventoryMove: moving keys held, turning or sustained speed while a container screen is provably
+  # open (server-opened windows after acknowledgement, the own inventory inferred from clicks). Experimental.
+  inventorymove:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.02
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: inventory
+    options:
+      check-keys: true
+      check-rotation: true
+      check-motion: true
+      # Ticks after the window is proven open that are not judged. 0..40
+      grace-ticks: 5
+      # Ticks without a click after which the inferred own inventory counts as closed. 20..2000
+      inferred-idle-ticks: 100
+      # Rotation in the inferred inventory only counts this many ticks after a click. 1..100
+      rotation-click-window-ticks: 10
+      # Smallest rotation (yaw + pitch degrees) that counts as turning. 0..30
+      min-rotation-degrees: 0.05
+      # Older clients: ground speed that must not decay for motion-sustain-ticks. 0.05..1
+      motion-min-speed: 0.15
+      motion-sustain-ticks: 8
+  # AutoArmor / AutoTotem: offhand action right after the own totem pop, own-inventory clicks while
+  # movement keys are held, click and attack in one tick, armor shift-clicks in consecutive ticks. Experimental.
+  autoarmor:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.25
+      max: 6.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: inventory
+    options:
+      check-totem: true
+      check-moving: true
+      check-attack: true
+      check-armor: true
+      # Client ticks after the acknowledged totem pop within which an offhand action is too fast. 0..10
+      max-reaction-ticks: 2
+      # Offhand actions later than this after the pop are not judged.
+      reaction-window-ticks: 100
+      # Ticks movement input must be held before an inventory click counts. 1..40
+      move-grace-ticks: 3
+      # Armor shift-clicks in a row, each at most armor-max-gap-ticks apart, that flag.
+      armor-min-clicks: 3
+      armor-max-gap-ticks: 1
+  # AutoTotem: Hover Totem / Auto Inventory Totem SWAP pairs and consistent refill delays,
+  # including Totem Offhand's hotbar + F swap. Only known non-totem -> totem transitions count.
+  # Explicit client ticks on new clients; guarded monotonic time on 1.21.1/legacy clients. Experimental.
+  # AutoArmor's existing fast-reaction check is separate and remains unchanged.
+  autototem:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.5
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: inventory
+    options:
+      # Gather live false-positive evidence before allowing punishments.
+      log-only: true
+      check-consistency: true
+      check-pairs: true
+      # Legacy clients lack tick-end packets. Use elapsed time only at known RTT <= this limit.
+      # Ignores sub-10ms bursts; remaining network jitter can still affect these heuristics.
+      check-legacy-timing: true
+      legacy-max-rtt-ms: 150
+      # Same-method pop-to-offhand samples, 5..20. Random source slots do not reset samples.
+      min-samples: 6
+      reaction-window-ticks: 100
+      # Bounded mean (0..40) and low variance (0..2); legacy units are 50ms, not inferred client ticks.
+      max-mean-ticks: 20.0
+      max-stddev-ticks: 0.35
+      # Hotbar + offhand SWAP equips this many client ticks apart, 0..3.
+      pair-gap-ticks: 1
+  # FastUse: item uses (throwables etc.) in every tick, several per tick or above a rate a human can
+  # click. Eating/drinking/bows are server-ticked and not judged. Tick-end clients only.
+  fastuse:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Consecutive client ticks with a use. >= 5
+      max-streak: 20
+      # Uses (per hand) within one tick. >= 2
+      max-per-tick: 3
+      # Uses within window-ticks. >= 5
+      max-per-window: 30
+      window-ticks: 20

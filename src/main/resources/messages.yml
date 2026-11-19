@@ -1,0 +1,64 @@
+# ------------------------------------------------------------------------------
+#  VA+ messages (MiniMessage format: https://docs.advntr.dev/minimessage/format.html)
+#  %prefix% inserts the prefix; other %placeholders% are listed per message.
+#  Missing keys fall back to the built-in defaults.
+# ------------------------------------------------------------------------------
+prefix: "<dark_gray>[<gradient:#22d3ee:#a78bfa>VA+</gradient>]</dark_gray> "
+
+no-permission: "%prefix%<red>You do not have permission to do that."
+player-only: "%prefix%<red>Only players can use this."
+usage: "%prefix%<gray>Usage: <white>%usage%"
+unknown-player: "%prefix%<red>No tracked player named <white>%target%</white>."
+unknown-check: "%prefix%<red>Unknown check <white>%check%</white>."
+
+help:
+  - "%prefix%<gray>Commands:"
+  - "<dark_gray> » <white>/ac alerts</white> <gray>toggle alerts"
+  - "<dark_gray> » <white>/ac info <player></white> <gray>tracked state and violations"
+  - "<dark_gray> » <white>/ac logs <player> [page]</white> <gray>violation history"
+  - "<dark_gray> » <white>/ac profile [reset]</white> <gray>check performance"
+  - "<dark_gray> » <white>/ac debug <check|all> [player]</white> <gray>live check output"
+  - "<dark_gray> » <white>/ac reload</white> <gray>reload configuration"
+
+alerts-enabled: "%prefix%<green>Alerts enabled."
+alerts-disabled: "%prefix%<red>Alerts disabled."
+
+# Placeholders: %player% %uuid% %check% %check_id% %category% %vl% %count% %ping% %version% %details%
+alert: "%prefix%<hover:show_text:'<gray>Check: <white>%check%</white> <dark_gray>(%category%)</dark_gray><newline><gray>Details: <white>%details%</white><newline><gray>Ping: <white>%ping%ms</white> <dark_gray>|</dark_gray> <gray>Client: <white>%version%</white><newline><yellow>Click to teleport'><click:run_command:'/tp %player%'><white>%player%</white> <dark_gray>»</dark_gray> <aqua>%check%</aqua> <dark_gray>·</dark_gray> <gray>VL</gray> <red>%vl%</red></click></hover>"
+alert-experimental: "%prefix%<hover:show_text:'<gray>Check: <white>%check%</white> <dark_gray>(%category%, experimental)</dark_gray><newline><gray>Details: <white>%details%</white><newline><gray>Ping: <white>%ping%ms</white> <dark_gray>|</dark_gray> <gray>Client: <white>%version%</white><newline><yellow>Click to teleport'><click:run_command:'/tp %player%'><white>%player%</white> <dark_gray>»</dark_gray> <aqua>%check%</aqua> <gold>(exp)</gold> <dark_gray>·</dark_gray> <gray>VL</gray> <red>%vl%</red></click></hover>"
+staff-notice: "%prefix%<red>%player%</red> <gray>reached</gray> <white>%vl%</white> <gray>violations in</gray> <white>%check%</white><gray>.</gray>"
+
+kick-message: "<red>You were disconnected by VA+.</red><newline><gray>Unfair advantage detected."
+timeout-kick: "<red>Timed out.</red><newline><gray>Your client stopped answering latency probes."
+
+info:
+  - "%prefix%<gray>Info for <white>%player%"
+  - "<dark_gray> » <gray>Client <white>%version%</white> <dark_gray>|</dark_gray> <gray>Ping <white>%ping%ms</white> (avg %ping_avg%ms) <dark_gray>|</dark_gray> <gray>Pending acks <white>%pending%"
+  - "<dark_gray> » <gray>Gamemode <white>%gamemode%</white> <dark_gray>|</dark_gray> <gray>Flying <white>%flying%</white> <dark_gray>|</dark_gray> <gray>Bypass <white>%bypass%"
+  - "<dark_gray> » <gray>Client ticks <white>%ticks%</white> <dark_gray>(%tick_mode%)</dark_gray>"
+  - "<dark_gray> » <gray>Position <white>%x% %y% %z%</white> <dark_gray>|</dark_gray> <gray>Ground <white>%ground%"
+  - "<dark_gray> » <gray>Exemptions <white>%exemptions%"
+  - "<dark_gray> » <gray>Violations:"
+info-violation: "<dark_gray>   - <white>%check%</white> <red>x%vl%</red> <dark_gray>(%count% total)"
+info-no-violations: "<dark_gray>   - <gray>none"
+
+logs-header: "%prefix%<gray>Violations of <white>%player%</white> <dark_gray>(page %page%)"
+logs-entry: "<dark_gray> » <gray>%ago% ago</gray> <white>%check%</white> <red>x%vl%</red> <dark_gray>%ping%ms</dark_gray> <gray>%details%"
+logs-empty: "%prefix%<gray>No violations recorded for <white>%player%</white> <dark_gray>(page %page%)."
+logs-error: "%prefix%<red>Could not read the violation log, see console."
+
+profile-header:
+  - "%prefix%<gray>Profiler <dark_gray>(enabled: %enabled%, last %window%s)"
+  - "<dark_gray> » <gray>Players <white>%players%</white> <dark_gray>|</dark_gray> <gray>Packets <white>%packets%</white> <dark_gray>|</dark_gray> <gray>Client ticks <white>%ticks%"
+  - "<dark_gray> » <gray>Avg per packet <white>%packet_avg%ns</white> <dark_gray>|</dark_gray> <gray>Avg per player tick <white>%tick_avg%µs</white> <dark_gray>(budget %budget%µs)"
+profile-within-budget: "<dark_gray> » <green>Within budget."
+profile-over-budget: "<dark_gray> » <red>Over budget - check the most expensive checks below."
+profile-entry: "<dark_gray>   - <white>%check%</white> <gray>%avg%ns avg, %calls% calls, %share%%</gray>"
+profile-reset: "%prefix%<green>Profiler reset."
+
+debug-enabled: "%prefix%<green>Debugging <white>%check%</white> for <white>%target%</white>."
+debug-disabled: "%prefix%<red>Stopped debugging <white>%check%</white> for <white>%target%</white>."
+debug-line: "<dark_gray>[<aqua>dbg</aqua>]</dark_gray> <gray>%player%</gray> <white>%check%</white><dark_gray>:</dark_gray> <gray>%message%"
+
+reload-done: "%prefix%<green>Configuration reloaded</green> <gray>(%warnings% warnings)."
+reload-warning: "<dark_gray> » <yellow>%warning%"

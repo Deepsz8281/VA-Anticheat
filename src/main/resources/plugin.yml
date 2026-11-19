@@ -1,0 +1,29 @@
+name: VAPlus
+version: '${project.version}'
+main: dev.vaplus.anticheat.VAPlusPlugin
+description: Prediction-based anticheat for Paper, Purpur and Folia
+api-version: '1.21'
+folia-supported: true
+depend: [packetevents]
+
+commands:
+  ac:
+    description: VA+ anticheat staff command
+    usage: /ac <alerts|info|logs|profile|debug|reload>
+    aliases: [vaplus, anticheat]
+
+permissions:
+  ac.alerts:
+    description: Receive and toggle alerts, view player info and violation logs
+    default: op
+  ac.admin:
+    description: Reload the configuration, profile and debug checks
+    default: op
+    children:
+      ac.alerts: true
+  ac.bypass:
+    description: Exempt from all checks
+    default: false
+  ac.healthindicator.bypass:
+    description: Receive the real health, equipment and game mode of other entities (no anti-health-indicator spoofing)
+    default: false
