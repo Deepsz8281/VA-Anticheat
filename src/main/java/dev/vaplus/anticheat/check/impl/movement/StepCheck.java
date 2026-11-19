@@ -232,7 +232,8 @@ public final class StepCheck extends Check implements PositionCheck {
                 && columnClear(world, update.toX(), update.toZ(), y0, y1);
     }
 
-    private static boolean columnClear(WorldMirror world, double x, double z, int y0, int y1) {
+    /** Whether one column of blocks is known and free of anything that can push or launch a player (shared with {@link HighJumpCheck}). */
+    static boolean columnClear(WorldMirror world, double x, double z, int y0, int y1) {
         int x0 = (int) Math.floor(x - SCAN_REACH);
         int x1 = (int) Math.floor(x + SCAN_REACH);
         int z0 = (int) Math.floor(z - SCAN_REACH);

@@ -50,6 +50,7 @@ public final class MovementChecksModule implements AnticheatModule {
         context.registerCheck(SpiderCheck.DESCRIPTOR, player -> new SpiderCheck(player, worldKey, velocityKey));
         context.registerCheck(PhaseCheck.DESCRIPTOR, player -> new PhaseCheck(player, worldKey));
         context.registerCheck(StepCheck.DESCRIPTOR, player -> new StepCheck(player, worldKey, velocityKey));
+        context.registerCheck(HighJumpCheck.DESCRIPTOR, player -> new HighJumpCheck(player, worldKey, velocityKey));
         context.registerCheck(JesusCheck.DESCRIPTOR, player -> new JesusCheck(player, worldKey));
         context.registerCheck(VehicleCheck.DESCRIPTOR, player -> new VehicleCheck(player, worldKey));
         context.registerCheck(ElytraCheck.DESCRIPTOR, player -> new ElytraCheck(player, worldKey, velocityKey));

@@ -765,6 +765,23 @@ checks:
       velocity-window-ticks: 100
       # Sum all position packets of one client tick (tick-end clients only).
       check-packet-step: true
+  # HighJump: an airborne phase that started on the ground rises above the apex the jump velocity
+  # allows (jump_strength + Jump Boost under the gravity attribute; 1.25 blocks by default).
+  highjump:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.25
+      max: 4.0
+    vl-decay-per-minute: 6.0
+    alert-vl: 1.0
+    setback-vl: 1.0
+    profile: movement
+    options:
+      # Blocks tolerated above the computed apex.
+      tolerance: 0.05
+      # Ticks a registered server velocity excuses the following airborne phase. 0..6000
+      velocity-window-ticks: 100
   # Jesus: resting or walking on top of water/lava (feet at a liquid surface, plain liquid below, plain
   # air above, no vertical motion) for longer than min-ticks. Experimental.
   jesus:
@@ -897,6 +914,33 @@ checks:
       check-snap: true
       snap-min-degrees: 35.0
       snap-hold-ticks: 10
+      snap-return-ratio: 0.15
+      snap-return-degrees: 4.0
+  # SilentRotation: the sent rotation is not the camera's. Experimental.
+  silentrotation:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.01
+      max: 6.0
+    vl-decay-per-minute: 3.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Move: walking with forward-only input (1.21.2+ clients) more than move-max-degrees away from
+      # the sent yaw for move-min-ticks packets, on plain ground with a steady yaw (within
+      # move-stable-degrees) and at least move-min-speed blocks per tick.
+      check-move: true
+      move-max-degrees: 50.0
+      move-min-ticks: 4
+      move-min-speed: 0.15
+      move-stable-degrees: 10.0
+      # Snap: jump at least snap-min-degrees away, use an item or start digging, and jump back within
+      # snap-hold-ticks to within max(snap-return-degrees, snap-return-ratio x jump) of the start.
+      check-snap: true
+      snap-min-degrees: 35.0
+      snap-hold-ticks: 2
       snap-return-ratio: 0.15
       snap-return-degrees: 4.0
   # Post: attacks, swings, item use, placing, digging or slot changes sent after the movement packet

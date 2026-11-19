@@ -14,7 +14,7 @@ import java.util.Objects;
 /**
  * Combat checks: {@link ReachCheck}, {@link ThroughWallCheck}, {@link KillauraCheck},
  * {@link AutoclickerCheck}, {@link TriggerbotCheck}, {@link HitboxCheck}, {@link CriticalsCheck},
- * {@link MaceCheck} and {@link AimCheck}.
+ * {@link MaceCheck}, {@link AimCheck} and {@link SilentRotationCheck}.
  *
  * <p>Installed after {@code VisibilityChecksModule} (it resolves that module's
  * {@link NearbyPlayers} component) and after {@code SimulationModule} (world mirror). Combat checks
@@ -50,12 +50,15 @@ public final class CombatChecksModule implements AnticheatModule {
                 player -> new CriticalsCheck(player, world, simulation.velocityKey()));
         context.registerCheck(MaceCheck.DESCRIPTOR, player -> new MaceCheck(player, simulation.velocityKey(), world));
         context.registerCheck(AimCheck.DESCRIPTOR, player -> new AimCheck(player, tracked));
+        context.registerCheck(SilentRotationCheck.DESCRIPTOR,
+                player -> new SilentRotationCheck(player, world, simulation.velocityKey()));
     }
 
     /** Descriptors in registration order (tests, diagnostics). */
     public static CheckDescriptor[] descriptors() {
         return new CheckDescriptor[]{ReachCheck.DESCRIPTOR, ThroughWallCheck.DESCRIPTOR,
                 KillauraCheck.DESCRIPTOR, AutoclickerCheck.DESCRIPTOR, TriggerbotCheck.DESCRIPTOR, HitboxCheck.DESCRIPTOR,
-                CriticalsCheck.DESCRIPTOR, MaceCheck.DESCRIPTOR, AimCheck.DESCRIPTOR};
+                CriticalsCheck.DESCRIPTOR, MaceCheck.DESCRIPTOR, AimCheck.DESCRIPTOR,
+                SilentRotationCheck.DESCRIPTOR};
     }
 }
