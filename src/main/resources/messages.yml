@@ -33,7 +33,7 @@ timeout-kick: "<red>Timed out.</red><newline><gray>Your client stopped answering
 
 info:
   - "%prefix%<gray>Info for <white>%player%"
-  - "<dark_gray> » <gray>Client <white>%version%</white> <dark_gray>|</dark_gray> <gray>Ping <white>%ping%ms</white> (avg %ping_avg%ms) <dark_gray>|</dark_gray> <gray>Pending acks <white>%pending%"
+  - "<dark_gray> » <gray>Client <white>%version%</white> (%brand%) <dark_gray>|</dark_gray> <gray>Ping <white>%ping%ms</white> (avg %ping_avg%ms) <dark_gray>|</dark_gray> <gray>Pending acks <white>%pending%"
   - "<dark_gray> » <gray>Gamemode <white>%gamemode%</white> <dark_gray>|</dark_gray> <gray>Flying <white>%flying%</white> <dark_gray>|</dark_gray> <gray>Bypass <white>%bypass%"
   - "<dark_gray> » <gray>Client ticks <white>%ticks%</white> <dark_gray>(%tick_mode%)</dark_gray>"
   - "<dark_gray> » <gray>Position <white>%x% %y% %z%</white> <dark_gray>|</dark_gray> <gray>Ground <white>%ground%"

@@ -51,6 +51,8 @@ import dev.vaplus.anticheat.world.mirror.WorldMirror;
  *   <li>a sprint jump (ground tick with upward motion) adds 0.2 along the facing direction (only if
  *       the jump key is down, when the input is known).</li>
  * </ul>
+ * Explosion knockback (Grim ExplosionHandler) is added to the motion the player already had, so its
+ * window starts with the knockback minus the previous movement against it ({@code check-explosions}).
  * Fewer than {@code kb-ratio} of that bound is a violation. Knockback whose bound is below
  * {@code kb-min-expected} (weak hits, jump resets) is not judged. The window is dropped on
  * horizontal collisions, teleports, liquids, climbable, slowing or unknown blocks, sneaking, own
@@ -112,6 +114,7 @@ public final class VelocityCheck extends Check implements PositionCheck, ClientT
     private double minVelocity = DEFAULT_MIN_VELOCITY;
     private boolean checkDistance = true;
     private double kbMinVelocity = DEFAULT_KB_MIN_VELOCITY;
+    private boolean checkExplosions = true;
     private int kbTicks = DEFAULT_KB_TICKS;
     private double kbRatio = DEFAULT_KB_RATIO;
     private double kbMinExpected = DEFAULT_KB_MIN_EXPECTED;
@@ -150,6 +153,7 @@ public final class VelocityCheck extends Check implements PositionCheck, ClientT
         threshold = MovementOptions.tolerance(options, "threshold", DEFAULT_THRESHOLD);
         minVelocity = MovementOptions.tolerance(options, "min-velocity", DEFAULT_MIN_VELOCITY);
         checkDistance = options.getBoolean("check-distance", true);
+        checkExplosions = options.getBoolean("check-explosions", true);
         kbMinVelocity = MovementOptions.tolerance(options, "kb-min-velocity", DEFAULT_KB_MIN_VELOCITY);
         int ticks = options.getInt("kb-ticks", DEFAULT_KB_TICKS);
         kbTicks = ticks >= 1 && ticks <= 20 ? ticks : DEFAULT_KB_TICKS;
@@ -240,7 +244,9 @@ public final class VelocityCheck extends Check implements PositionCheck, ClientT
             }
             lastSeenId = id;
             windowActive = false;
-            if (id <= maxSplitId || velocity.tainted(i) || velocity.kind(i) != VelocityState.Kind.SET
+            boolean explosion = velocity.kind(i) == VelocityState.Kind.ADD;
+            if (id <= maxSplitId || velocity.tainted(i) || (explosion && !checkExplosions)
+                    || (!explosion && velocity.kind(i) != VelocityState.Kind.SET)
                     || attackTick == player.clientTicks()) {
                 continue;
             }
@@ -248,12 +254,22 @@ public final class VelocityCheck extends Check implements PositionCheck, ClientT
             if (horizontal < kbMinVelocity) {
                 continue;
             }
+            double start = horizontal;
+            if (explosion) {
+                // added to the old motion: only movement against the push can shrink it
+                double previous = (player.movement().x() - player.movement().lastX()) * velocity.x(i) / horizontal
+                        + (player.movement().z() - player.movement().lastZ()) * velocity.z(i) / horizontal;
+                start = horizontal + Math.min(0.0, previous);
+                if (start < kbMinVelocity) {
+                    continue;
+                }
+            }
             windowActive = true;
             windowRegistered = velocity.registered();
             dirX = velocity.x(i) / horizontal;
             dirZ = velocity.z(i) / horizontal;
-            knockback = horizontal;
-            motion = horizontal;
+            knockback = start;
+            motion = start;
             expected = 0.0;
             travelled = 0.0;
             steps = 0;

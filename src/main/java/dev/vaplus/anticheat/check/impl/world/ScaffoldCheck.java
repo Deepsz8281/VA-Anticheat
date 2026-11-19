@@ -55,11 +55,42 @@ import dev.vaplus.anticheat.world.mirror.WorldMirror;
  *       their exact start rotation within a few ticks.</li>
  * </ul>
  *
+ * <p>Packet-level signals (Grim equivalents in brackets):
+ * <ul>
+ *   <li><b>invalid-face</b> (InvalidPlaceFace) — a placement face id outside 0..5.</li>
+ *   <li><b>multi</b> (MultiPlace, 1.21.2+) — two placements in one client tick that differ in
+ *       block, face or hit point. Vanilla can only repeat the same hit within a tick (queued clicks
+ *       reuse the frame's hit result).</li>
+ *   <li><b>duplicate-rotation</b> (DuplicateRotPlace) — the yaw change sent right after a placement
+ *       repeats the one after the previous placement to 0.0001 degrees while turning more than 2 degrees.
+ *       Weak on its own; it only adds half a point to the buffer.</li>
+ * </ul>
+ *
  * <p>Never judged: {@code insideBlock} placements, vehicles, gliding, creative/spectator (WORLD
  * category exemption), pending attributes (reach), unknown rotation (ray). Experimental; numbers
  * are TUNING values.
  */
-public final class ScaffoldCheck extends Check implements BlockCheck, RotationCheck, ClientTickCheck {
+public final class ScaffoldCheck extends Check implements BlockCheck, RotationCheck, ClientTickCheck,
+        dev.vaplus.anticheat.check.PacketCheck {
+
+    /** Yaw change below which repeated rotations are not judged (Grim DuplicateRotPlace). */
+    static final float DUPLICATE_MIN_YAW = 2.0f;
+    static final float DUPLICATE_EPSILON = 0.0001f;
+
+    private boolean checkInvalidFace = true;
+    private boolean checkMulti = true;
+    private boolean checkDuplicateRotation = true;
+    private boolean placedThisTick;
+    private int tickPlaceX;
+    private int tickPlaceY;
+    private int tickPlaceZ;
+    private BlockFace tickPlaceFace;
+    private float tickCursorX;
+    private float tickCursorY;
+    private float tickCursorZ;
+    private boolean placeAwaitingRotation;
+    private float lastPlacedYawDelta = Float.NaN;
+
 
     /** Vanilla standing eye height (also {@link FreecamCheck#STANDING_EYE_HEIGHT}). */
     public static final double MAX_EYE_HEIGHT = 1.62;
@@ -179,6 +210,58 @@ public final class ScaffoldCheck extends Check implements BlockCheck, RotationCh
         checkReach = options.getBoolean("check-reach", true);
         checkAir = options.getBoolean("check-air", true);
         checkSnap = options.getBoolean("check-snap", true);
+        checkInvalidFace = options.getBoolean("check-invalid-face", true);
+        checkMulti = options.getBoolean("check-multi", true);
+        checkDuplicateRotation = options.getBoolean("check-duplicate-rotation", true);
+    }
+
+    @Override
+    public void onPacketReceive(com.github.retrooper.packetevents.event.PacketReceiveEvent event) {
+        if (event.getPacketType() == com.github.retrooper.packetevents.protocol.packettype.PacketType.Play.Client
+                .PLAYER_BLOCK_PLACEMENT) {
+            onPlaceFaceId(new com.github.retrooper.packetevents.wrapper.play.client
+                    .WrapperPlayClientPlayerBlockPlacement(event).getFaceId());
+        }
+    }
+
+    /** Raw face id of a placement (invalid-face). */
+    void onPlaceFaceId(int faceId) {
+        if (checkInvalidFace && (faceId < 0 || faceId > 5) && !isExempt()) {
+            violation("signal=invalid-face id=" + faceId);
+        }
+    }
+
+    /** Several different placements in one client tick (multi). */
+    private void multiPlace(BlockInteraction interaction) {
+        boolean same = placedThisTick && interaction.blockX() == tickPlaceX && interaction.blockY() == tickPlaceY
+                && interaction.blockZ() == tickPlaceZ && interaction.face() == tickPlaceFace
+                && interaction.cursorX() == tickCursorX && interaction.cursorY() == tickCursorY
+                && interaction.cursorZ() == tickCursorZ;
+        if (checkMulti && placedThisTick && !same && player.tickEndMode() && !isExempt()) {
+            flag(2.0, "signal=multi target=" + interaction.blockX() + "," + interaction.blockY() + ","
+                    + interaction.blockZ() + " previous=" + tickPlaceX + "," + tickPlaceY + "," + tickPlaceZ);
+        }
+        placedThisTick = true;
+        tickPlaceX = interaction.blockX();
+        tickPlaceY = interaction.blockY();
+        tickPlaceZ = interaction.blockZ();
+        tickPlaceFace = interaction.face();
+        tickCursorX = interaction.cursorX();
+        tickCursorY = interaction.cursorY();
+        tickCursorZ = interaction.cursorZ();
+    }
+
+    /** The same yaw change in the rotation sent after two placements (duplicate-rotation). */
+    private void duplicateRotation(float delta) {
+        placeAwaitingRotation = false;
+        float previous = lastPlacedYawDelta;
+        lastPlacedYawDelta = delta;
+        if (!checkDuplicateRotation || isExempt() || player.vehicle().inVehicle() || Float.isNaN(previous)) {
+            return;
+        }
+        if (delta > DUPLICATE_MIN_YAW && Math.abs(delta - previous) < DUPLICATE_EPSILON) {
+            flag(0.5, "signal=duplicate-rotation yaw-delta=" + delta);
+        }
     }
 
     private static double range(double value, double min, double max, double fallback) {
@@ -199,6 +282,8 @@ public final class ScaffoldCheck extends Check implements BlockCheck, RotationCh
         if (interaction.kind() != BlockInteraction.Kind.PLACE || interaction.insideBlock()) {
             return;
         }
+        multiPlace(interaction);
+        placeAwaitingRotation = true;
         long tick = player.clientTicks();
         int bx = interaction.blockX();
         int by = interaction.blockY();
@@ -353,6 +438,8 @@ public final class ScaffoldCheck extends Check implements BlockCheck, RotationCh
 
     @Override
     public void onClientTick() {
+        placedThisTick = false;
+        placeAwaitingRotation = false;
         if (pendingCount > 0) {
             MovementState movement = player.movement();
             judgePending(movement.yaw(), movement.pitch());
@@ -463,7 +550,11 @@ public final class ScaffoldCheck extends Check implements BlockCheck, RotationCh
         }
         if (change.teleport() || player.vehicle().inVehicle()) {
             historySize = 0;
+            placeAwaitingRotation = false;
             return;
+        }
+        if (placeAwaitingRotation) {
+            duplicateRotation(Math.abs(change.wrappedDeltaYaw()));
         }
         if (!checkSnap) {
             return;

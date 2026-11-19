@@ -71,6 +71,8 @@ public final class PlayerData {
     private volatile boolean disconnecting;
     private volatile boolean kickRequested;
     private volatile long kickRequestedNanos;
+    private volatile byte[] clientBrandPayload;
+    private volatile boolean chatHidden;
     private boolean tickEndMode;
     private long lastSetbackNanos;
     private boolean setbackIssued;
@@ -209,6 +211,31 @@ public final class PlayerData {
 
     public void attach(Player player) {
         this.bukkitPlayer = player;
+    }
+
+    /** Raw {@code minecraft:brand} payload the client sent, or {@code null}. */
+    public byte[] clientBrandPayload() {
+        return clientBrandPayload;
+    }
+
+    public void clientBrandPayload(byte[] payload) {
+        this.clientBrandPayload = payload;
+    }
+
+    /** Decoded client brand for display, {@code "?"} while unknown. */
+    public String clientBrand() {
+        byte[] payload = clientBrandPayload;
+        String brand = dev.vaplus.anticheat.check.impl.packet.ClientBrandCheck.decode(payload);
+        return brand != null ? brand.replaceAll("\\p{Cntrl}", "") : (payload == null ? "?" : "invalid");
+    }
+
+    /** Whether the client's chat visibility is "hidden". */
+    public boolean chatHidden() {
+        return chatHidden;
+    }
+
+    public void chatHidden(boolean hidden) {
+        this.chatHidden = hidden;
     }
 
     /** Whether the player holds the bypass permission (refreshed periodically on the entity thread). */

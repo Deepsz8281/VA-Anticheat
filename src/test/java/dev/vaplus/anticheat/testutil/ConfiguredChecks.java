@@ -38,7 +38,11 @@ public final class ConfiguredChecks {
             dev.vaplus.anticheat.check.impl.movement.FastLadderCheck.DESCRIPTOR,
             dev.vaplus.anticheat.check.impl.combat.InteractCheck.DESCRIPTOR,
             dev.vaplus.anticheat.check.impl.world.BreakingCheck.DESCRIPTOR,
-            dev.vaplus.anticheat.check.impl.packet.MultiActionsCheck.DESCRIPTOR);
+            dev.vaplus.anticheat.check.impl.packet.MultiActionsCheck.DESCRIPTOR,
+            dev.vaplus.anticheat.check.impl.packet.ChatCheck.DESCRIPTOR,
+            dev.vaplus.anticheat.check.impl.packet.ClientBrandCheck.DESCRIPTOR,
+            dev.vaplus.anticheat.check.impl.packet.PacketOrderCheck.DESCRIPTOR,
+            dev.vaplus.anticheat.check.impl.combat.BaritoneCheck.DESCRIPTOR);
 
     private ConfiguredChecks() {
     }

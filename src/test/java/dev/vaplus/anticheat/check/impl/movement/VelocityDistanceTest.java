@@ -76,6 +76,38 @@ class VelocityDistanceTest {
         assertEquals(0, check(s).distanceFailures());
     }
 
+    /** Explosion knockback along +z (added to the motion), both markers acknowledged. */
+    private static void explode(ReplayScenario s, double horizontal) {
+        VelocityState velocity = s.velocity();
+        long id = velocity.register(VelocityState.Kind.ADD, 0.0, 0.2, horizontal, s.player.movement().worldEpoch());
+        velocity.markFirstAck(id);
+        velocity.markSecondAck(id, s.player.clientTicks());
+    }
+
+    @Test
+    @DisplayName("explosions: taking the push passes, ignoring it flags")
+    void explosions() {
+        ReplayScenario s = scenario();
+        for (int hit = 0; hit < 3; hit++) {
+            explode(s, 0.6);
+            double motion = 0.6;
+            for (int t = 0; t < 3; t++) {
+                tick(s, 0, 0, motion, true);
+                motion *= 0.546;
+            }
+            land(s, 0);
+        }
+        assertEquals(0, check(s).distanceFailures());
+        for (int hit = 0; hit < 3; hit++) {
+            explode(s, 0.6);
+            for (int t = 0; t < 3; t++) {
+                tick(s, 0, 0, 0, true);
+            }
+            land(s, 0);
+        }
+        assertEquals(3, check(s).distanceFailures());
+    }
+
     @Test
     @DisplayName("ignoring knockback flags")
     void ignoredKnockback() {

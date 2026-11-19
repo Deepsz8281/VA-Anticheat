@@ -1,6 +1,6 @@
 # Checks
 
-VA+ has 47 checks in five categories. The **id** is the key under `checks:` in `config.yml` and the
+VA+ has 51 checks in five categories. The **id** is the key under `checks:` in `config.yml` and the
 name used by `/ac debug`.
 
 Checks marked *experimental* are heuristic. Their alerts use the `alert-experimental` message, so
@@ -28,8 +28,8 @@ Default profile `movement`. Movement checks can set the player back.
 | `phase` | Phase | Moving into or through solid blocks | experimental |
 | `noslow` | NoSlow | Full speed while using an item | experimental |
 | `sprint` | Sprint | Sprinting without forward input, with 6 or less food, started while blind, into a wall, while gliding or in shallow water | omni and wall 1.21.2+ |
-| `velocity` | Velocity | Knockback that does not show up in the movement (anti-KB) | Distance signal partly 1.21.2+ |
-| `elytra` | Elytra | Gliding that hovers or keeps climbing without a boost | experimental |
+| `velocity` | Velocity | Hit and explosion knockback that does not show up in the movement (anti-KB) | Distance signal partly 1.21.2+ |
+| `elytra` | Elytra | Gliding that hovers or keeps climbing without a boost; glide starts vanilla refuses (already gliding, without jump, too often, without elytra, flying, on the ground, levitation, vehicle, water) | experimental, jump and frequency 1.21.2+ |
 | `vehicle` | Vehicle | BoatFly, vehicle speed, mount high jump, impossible steering, mount jumps and paddle packets | experimental |
 
 ## Combat
@@ -48,6 +48,7 @@ Default profile `combat`. Combat checks only judge targets the server actually s
 | `criticals` | Criticals | Attacks after a faked take-off (packet crits) | experimental |
 | `mace` | Mace | Mace hits backed by a fake fall | experimental |
 | `interact` | Interact | Interacting with the own entity, hit points outside the target, several hit points per tick | |
+| `baritone` | Baritone | Bot-like pitch-only rotations off the mouse grid | experimental |
 | `through-wall` | ThroughWall | Hits on players fully behind opaque blocks | experimental |
 | `esp` | ESP | Keeps aiming at players hidden behind blocks | experimental |
 
@@ -62,7 +63,10 @@ Default profile `packet`.
 | `blink` | Blink | Movement packets held back and released in a burst | experimental |
 | `post` | Post | Attacks and interactions sent after the movement packet of the same tick | experimental, 1.21.2+ |
 | `multiactions` | MultiActions | Digging or swinging while using an item, closing GUIs while moving, block and entity in one tick, acting while rowing | experimental |
-| `crasher` | Crasher | Packets that can only lag or crash the server (they are dropped) | |
+| `chat` | Chat | Blank suggestion requests, untrimmed or slash chat messages, chatting while moving or with hidden chat | moving 1.21.2+ |
+| `clientbrand` | ClientBrand | Blocked (configurable) or malformed client brands | |
+| `packetorder` | PacketOrder | Packets in an order the vanilla client tick cannot produce, out-of-order marker answers, chunk batch acknowledgements at the wrong time | experimental, tick-end signal 1.21.2+ |
+| `crasher` | Crasher | Packets that can only lag or crash the server (they are dropped): floods, oversized packets, invalid clicks, books, positions beyond the world limit, creative packets outside creative, lectern clicks, negative sequences, bundle indexes, long anvil names | |
 
 ## World
 
@@ -70,7 +74,7 @@ Default profile `world`.
 
 | Id | Name | Detects | Notes |
 |---|---|---|---|
-| `scaffold` | Scaffold | Placements against faces the eye cannot see, silent rotations while bridging | experimental |
+| `scaffold` | Scaffold | Placements against faces the eye cannot see, silent rotations while bridging, invalid faces, several placements per tick, repeated rotations | experimental |
 | `breaking` | Breaking | Digging air or liquids, invalid faces, without swing, hidden faces, crafted aborts | |
 | `blockreach` | BlockReach | Digging blocks beyond the interaction range | |
 | `nuker` | Nuker | Several blocks per tick or blocks outside the crosshair | Multi signal 1.21.2+ |

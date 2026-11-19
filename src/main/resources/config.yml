@@ -34,6 +34,9 @@ setback:
   confirmations: 2
   # Window for "confirmations", in milliseconds.
   window: 4000
+  # Drop the client's position packets while one of our setbacks waits for its confirmation, so the
+  # server never applies a move that is being pulled back (Grim SetbackBlocker).
+  block-movement: true
 
 profiling:
   # Measures check cost for /ac profile (adds two clock reads per check call).
@@ -541,6 +544,75 @@ checks:
       check-block-and-entity: true
       # Attacking, interacting, using or placing while paddling a boat (1.21.2+).
       check-rowing: true
+  # Chat: chat packets vanilla cannot send (Grim ChatA-D).
+  chat:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 2.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      # A suggestion request for "/" or blank text.
+      check-blank-tab: true
+      # Empty or untrimmed messages, messages starting with "/", untrimmed commands.
+      check-invalid-message: true
+      # Chatting while sprinting or holding movement keys (1.21.2+). Experimental.
+      check-moving: true
+      # Messages and commands matching this regular expression are never judged by check-moving.
+      exempt-regex: ""
+      # Chatting while the client's chat visibility is "hidden".
+      check-hidden: true
+  # ClientBrand: the brand the client reports (shown in /ac info). Brands are easy to fake.
+  clientbrand:
+    enabled: true
+    vl-decay-per-minute: 1.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      # Comma separated, case-insensitive parts of brands to flag, e.g. "wurst, meteor". Empty = none.
+      blocked-brands: ""
+      # Empty, malformed or longer than 64 bytes brand payloads.
+      check-invalid: true
+  # PacketOrder: packets in an order the vanilla client tick cannot produce (Grim PacketOrderA-P and
+  # TransactionOrder). Experimental.
+  packetorder:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 3.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      # A: pickup and quick-move clicks in one tick (clients up to 1.12.2).
+      check-click-order: true
+      # C: INTERACT without the matching INTERACT_AT before it.
+      check-interact-order: true
+      # D: offhand entity interaction without the mainhand one.
+      check-hand-order: true
+      # E: slot change after an attack, use, release, sneak, sprint, bed, glide or mount jump.
+      check-slot: true
+      # F: attack, interaction, use, pick or dig after a sprint or sneak change of the same tick.
+      check-after-pose: true
+      # G, K, L: swap or drop after attacking/using/digging, swap or open after drop.
+      check-inventory: true
+      # H: sprint and sneak changes in the wrong order for the client version.
+      check-pose-order: true
+      # I, J, M, N: release, attack, use, place and interaction orders.
+      check-use-order: true
+      # O (1.21.2+): game actions after the movement packet and before the tick end.
+      check-tick-end: true
+      # P: chunk batch acknowledgements before the batch, late or without one.
+      check-chunk-ack: true
+      # TransactionOrder: marker answers that skip earlier markers.
+      check-transactions: true
   # FastPlace: placements per client tick (tick-end clients 1.21.2+ only). Holding right-click places
   # every 4 ticks; long streaks, several placements per tick or more than 20/s are not human.
   fastplace:
@@ -682,6 +754,8 @@ checks:
       kb-ticks: 3
       kb-ratio: 0.5
       kb-min-expected: 0.2
+      # Explosion knockback (Grim ExplosionHandler) in the distance signal.
+      check-explosions: true
   # Scaffold: placements against a full-cube face the eye cannot see, or whose hit point is not on the
   # clicked face. Only judged when the target is a mirrored full opaque cube. Experimental.
   scaffold:
@@ -720,6 +794,12 @@ checks:
       snap-hold-ticks: 3
       snap-return-ratio: 0.1
       snap-return-degrees: 5.0
+      # Grim InvalidPlaceFace: a placement face id outside 0..5.
+      check-invalid-face: true
+      # Grim MultiPlace (1.21.2+): different placements in one client tick.
+      check-multi: true
+      # Grim DuplicateRotPlace: the same yaw change after every placement (half a buffer point each).
+      check-duplicate-rotation: true
   # Phase: the (shrunk, 0.6 high) player box ends inside, or tunnels in one tick through, a mirrored
   # full solid cube. Pending world windows and recent own digs/placements near the path are skipped.
   phase:
@@ -769,6 +849,20 @@ checks:
       max-book-page-length: 1024
       max-book-title-length: 32
       max-tab-complete-length: 2048
+      # Grim CrashA: positions beyond the world limit (|x|, |z| > 29 999 999) or not finite.
+      check-position: true
+      # Grim CrashB: creative inventory packets outside creative mode.
+      check-creative: true
+      # Grim CrashD: slot clicks in an open lectern.
+      check-lectern: true
+      # Grim CrashE: view distance below 2 (raised to 2).
+      check-view-distance: true
+      # Grim CrashG: negative block or item sequence numbers.
+      check-sequence: true
+      # Grim CrashI: bundle selection below -1.
+      check-bundle: true
+      # Grim ExploitA: anvil names longer than 50 characters.
+      check-item-name: true
   # Criticals: attacks during a faked take-off (packet crits / mini-jumps): an airborne claim right
   # after ground that is lower than a jump and that the movement engine cannot explain. Experimental.
   criticals:
@@ -1039,6 +1133,21 @@ checks:
       check-cursor: true
       # Two different "interact at" hit points in one client tick (1.21.2+). Experimental.
       check-multi: true
+  # Baritone: pitch-only rotations off every mouse grid, as path bots turn (Grim Baritone).
+  # The cinematic camera and controller mods leave the grid too. Experimental.
+  baritone:
+    enabled: true
+    buffer:
+      limit: 2.0
+      decay: 0.05
+      max: 6.0
+    vl-decay-per-minute: 2.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Consecutive yaw-free pitch steps below one degree off the grid before a point is added.
+      min-streak: 8
   # SilentRotation: the sent rotation is not the camera's. Experimental.
   silentrotation:
     enabled: true
@@ -1149,6 +1258,18 @@ checks:
       climb-ticks: 100
       # Ticks after an item use (rocket, wind charge, trident) or server velocity that are not judged.
       boost-grace-ticks: 80
+      # Glide starts vanilla refuses (Grim ElytraA-I): while still gliding, without a fresh jump press
+      # (1.21.2+), twice within two ticks (1.21.2+), without a glider in the armor slots (only while the
+      # server set them), while flying, on the ground, with levitation, as a passenger or in water.
+      check-start-gliding: true
+      check-start-jump: true
+      check-start-frequency: true
+      check-start-no-elytra: true
+      check-start-flying: true
+      check-start-ground: true
+      check-start-levitation: true
+      check-start-vehicle: true
+      check-start-water: true
   # InventoryMove: moving keys held, turning or sustained speed while a container screen is provably
   # open (server-opened windows after acknowledgement, the own inventory inferred from clicks). Experimental.
   inventorymove:

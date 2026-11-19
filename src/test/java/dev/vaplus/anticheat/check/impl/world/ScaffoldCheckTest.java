@@ -206,8 +206,10 @@ class ScaffoldCheckTest {
             // Sent rotation before: 20 degrees off; the camera reached the block during the tick.
             f.player.movement().applyRotation(look[0] - 20f, look[1] - 10f);
             f.place(1, 63, 0, BlockFace.UP, 0.5f, 1.0f, 0.5f);
-            rotate(f, look[0] - 20f, look[1] - 10f, look[0] + 5f, look[1] + 2f);
-            f.player.movement().applyRotation(look[0] + 5f, look[1] + 2f);
+            // a human never repeats a turn exactly (duplicate-rotation)
+            float end = look[0] + 5f + i * 0.01f;
+            rotate(f, look[0] - 20f, look[1] - 10f, end, look[1] + 2f);
+            f.player.movement().applyRotation(end, look[1] + 2f);
             f.player.onClientTick();
         }
         assertEquals(0, f.check.violationCount(), () -> "alerts: " + f.harness.alerts.alerts());

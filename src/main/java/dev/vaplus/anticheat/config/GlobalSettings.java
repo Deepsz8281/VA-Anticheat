@@ -6,6 +6,9 @@ package dev.vaplus.anticheat.config;
  *
  * @param serverTickMarkers {@code latency.server-tick-markers}: send one acknowledgement marker per
  *                          server tick so client acks map onto server ticks (handoff M15)
+ * @param setbackBlockMovement {@code setback.block-movement}: drop the client's position packets
+ *                          while one of our own setbacks waits for its confirmation (Grim
+ *                          SetbackBlocker), so the server never applies the moves we pull back
  */
 public record GlobalSettings(
         boolean alertsEnableOnJoin,
@@ -20,7 +23,8 @@ public record GlobalSettings(
         int logMaxPlayers,
         boolean serverTickMarkers,
         int setbackConfirmations,
-        long setbackWindowMillis) {
+        long setbackWindowMillis,
+        boolean setbackBlockMovement) {
 
     public static final long MIN_HEARTBEAT_MILLIS = 10L;
     /**
@@ -49,6 +53,17 @@ public record GlobalSettings(
         }
     }
 
+    /** Settings without the movement blocking toggle; blocking stays enabled. */
+    public GlobalSettings(boolean alertsEnableOnJoin, boolean alertsToConsole, long alertMinIntervalMillis,
+                          long heartbeatIntervalMillis, long ackTimeoutMillis, boolean setbacksEnabled,
+                          long setbackCooldownMillis, boolean profilingEnabled, int logEntriesPerPlayer,
+                          int logMaxPlayers, boolean serverTickMarkers, int setbackConfirmations,
+                          long setbackWindowMillis) {
+        this(alertsEnableOnJoin, alertsToConsole, alertMinIntervalMillis, heartbeatIntervalMillis, ackTimeoutMillis,
+                setbacksEnabled, setbackCooldownMillis, profilingEnabled, logEntriesPerPlayer, logMaxPlayers,
+                serverTickMarkers, setbackConfirmations, setbackWindowMillis, true);
+    }
+
     /** Settings without the setback-confirmation window; one violation confirms a setback. */
     public GlobalSettings(boolean alertsEnableOnJoin, boolean alertsToConsole, long alertMinIntervalMillis,
                           long heartbeatIntervalMillis, long ackTimeoutMillis, boolean setbacksEnabled,
@@ -75,6 +90,6 @@ public record GlobalSettings(
 
     public static GlobalSettings defaults() {
         return new GlobalSettings(true, true, 0L, 50L, 15_000L, true, 250L, true, 200, 500, true,
-                DEFAULT_SETBACK_CONFIRMATIONS, DEFAULT_SETBACK_WINDOW_MILLIS);
+                DEFAULT_SETBACK_CONFIRMATIONS, DEFAULT_SETBACK_WINDOW_MILLIS, true);
     }
 }

@@ -234,6 +234,16 @@ public final class TeleportQueue {
         return !pending.isEmpty();
     }
 
+    /** Whether one of our own setbacks (negative id) still waits for its confirmation. */
+    public boolean awaitingOwnSetback() {
+        for (Entry entry : pending) {
+            if (entry.teleportId() < 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public int pendingCount() {
         return pending.size();
     }

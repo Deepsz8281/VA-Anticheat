@@ -64,8 +64,10 @@ public final class SettingsParser {
         boolean profiling = root.getBoolean("profiling.enabled", defaults.profilingEnabled());
         int perPlayer = positive(root, "logging.memory-per-player", defaults.logEntriesPerPlayer(), warnings);
         int maxPlayers = positive(root, "logging.memory-max-players", defaults.logMaxPlayers(), warnings);
+        boolean blockMovement = root.getBoolean("setback.block-movement", defaults.setbackBlockMovement());
         return new GlobalSettings(enableOnJoin, console, alertInterval, heartbeat, ackTimeout, setbacks,
-                setbackCooldown, profiling, perPlayer, maxPlayers, serverTickMarkers, confirmations, setbackWindow);
+                setbackCooldown, profiling, perPlayer, maxPlayers, serverTickMarkers, confirmations, setbackWindow,
+                blockMovement);
     }
 
     static Map<String, List<ActionThreshold>> parseProfiles(ConfigurationSection section, List<String> warnings) {

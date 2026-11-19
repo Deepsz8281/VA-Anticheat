@@ -31,6 +31,7 @@ page explains how the parts fit together.
 | | `cooldown` | `250` | Minimum ms between two setbacks |
 | | `confirmations` | `2` | Violations needed inside `window` before a setback (1-8) |
 | | `window` | `4000` | ms window for `confirmations` |
+| | `block-movement` | `true` | Drop position packets while a setback waits for its confirmation |
 | `profiling` | `enabled` | `true` | Measure check cost for `/ac profile` |
 | `logging` | `memory-per-player` | `200` | Violations kept in memory per player for `/ac logs` (restart) |
 | | `memory-max-players` | `500` | Players kept in the memory log (restart) |

@@ -302,7 +302,7 @@ class MessageCatalogTest {
         MessageCatalog catalog = bundled();
         assertFalse(messages.getKeys(true).isEmpty());
         String[] allPairs = {"player", "Steve", "uuid", "u", "check", "Speed", "check_id", "speed", "category", "movement",
-                "vl", "1.0", "count", "1", "ping", "20", "version", "1.21.4", "details", "d", "usage", "/ac", "target", "T",
+                "vl", "1.0", "count", "1", "ping", "20", "version", "1.21.4", "brand", "vanilla", "details", "d", "usage", "/ac", "target", "T",
                 "ping_avg", "21", "pending", "1", "gamemode", "survival", "flying", "false", "bypass", "false", "ticks", "9",
                 "tick_mode", "movement", "x", "0", "y", "0", "z", "0", "ground", "true", "exemptions", "-", "ago", "1s",
                 "page", "1", "enabled", "true", "window", "10", "players", "2", "packets", "5", "packet_avg", "1",

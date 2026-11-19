@@ -36,6 +36,14 @@ public final class PacketPipeline extends PacketListenerAbstract {
     private final MovementProcessor movement;
     private final InteractionProcessor interactions = new InteractionProcessor();
     private final InboundTracker[] inbound;
+    /** Configuration-phase client data, kept until player data exists (created on JOIN_GAME). */
+    private final java.util.Map<com.github.retrooper.packetevents.protocol.player.User, PreJoin> preJoin =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final class PreJoin {
+        volatile byte[] brand;
+        volatile boolean chatHidden;
+    }
 
     public PacketPipeline(AnticheatContext context, PlayerDataRegistry players, ModuleSetup setup) {
         super(PacketListenerPriority.LOW);
@@ -49,6 +57,7 @@ public final class PacketPipeline extends PacketListenerAbstract {
     public void onPacketReceive(PacketReceiveEvent event) {
         PlayerData player = players.get(event.getUser());
         if (player == null) {
+            configuration(event);
             return;
         }
         CheckProfiler profiler = context.profiler();
@@ -61,6 +70,29 @@ public final class PacketPipeline extends PacketListenerAbstract {
         }
         if (profiling) {
             profiler.recordPacket(System.nanoTime() - start);
+        }
+    }
+
+    /** Remembers the brand and chat visibility a client sends before it joins the game. */
+    private void configuration(PacketReceiveEvent event) {
+        PacketTypeCommon type = event.getPacketType();
+        try {
+            if (type == PacketType.Configuration.Client.PLUGIN_MESSAGE) {
+                com.github.retrooper.packetevents.wrapper.configuration.client.WrapperConfigClientPluginMessage packet =
+                        new com.github.retrooper.packetevents.wrapper.configuration.client
+                                .WrapperConfigClientPluginMessage(event);
+                if (dev.vaplus.anticheat.check.impl.packet.ClientBrandCheck.CHANNEL.equals(packet.getChannelName())
+                        && event.getUser() != null) {
+                    preJoin.computeIfAbsent(event.getUser(), user -> new PreJoin()).brand = packet.getData();
+                }
+            } else if (type == PacketType.Configuration.Client.CLIENT_SETTINGS && event.getUser() != null) {
+                preJoin.computeIfAbsent(event.getUser(), user -> new PreJoin()).chatHidden =
+                        new com.github.retrooper.packetevents.wrapper.configuration.client.WrapperConfigClientSettings(event)
+                                .getChatVisibility() == com.github.retrooper.packetevents.wrapper.common.client
+                                .WrapperCommonClientSettings.ChatVisibility.HIDDEN;
+            }
+        } catch (RuntimeException decodeError) {
+            // the server's codec decides about malformed packets
         }
     }
 
@@ -87,11 +119,30 @@ public final class PacketPipeline extends PacketListenerAbstract {
 
         if (WrapperPlayClientPlayerFlying.isFlying(type)) {
             movement.handle(player, event);
+            blockDuringSetback(player, event, type);
         } else if (type == PacketType.Play.Client.CLIENT_TICK_END) {
             player.enableTickEndMode();
             player.onClientTick();
         } else {
             interactions.handle(player, event, type);
+        }
+    }
+
+    /**
+     * SetbackBlocker: while our own setback teleport waits for its confirmation, the client's
+     * position packets are tracked but not handed to the server, so it never applies a move we are
+     * pulling back. Rotation-only packets pass. The queue expires stale entries, so this cannot block
+     * a player for good.
+     */
+    private void blockDuringSetback(PlayerData player, PacketReceiveEvent event, PacketTypeCommon type) {
+        if (!context.settings().setbackBlockMovement()
+                || (type != PacketType.Play.Client.PLAYER_POSITION
+                && type != PacketType.Play.Client.PLAYER_POSITION_AND_ROTATION)) {
+            return;
+        }
+        TeleportQueue queue = TeleportQueue.resolve(player);
+        if (queue != null && queue.awaitingOwnSetback()) {
+            event.setCancelled(true);
         }
     }
 
@@ -107,6 +158,15 @@ public final class PacketPipeline extends PacketListenerAbstract {
         if (player == null) {
             return;
         }
+        if (type == PacketType.Play.Server.JOIN_GAME) {
+            PreJoin data = preJoin.remove(event.getUser());
+            if (data != null) {
+                if (data.brand != null) {
+                    player.clientBrandPayload(data.brand);
+                }
+                player.chatHidden(data.chatHidden);
+            }
+        }
         try {
             player.checks().dispatchSend(event);
         } catch (RuntimeException | LinkageError error) {
@@ -116,6 +176,7 @@ public final class PacketPipeline extends PacketListenerAbstract {
 
     @Override
     public void onUserDisconnect(UserDisconnectEvent event) {
+        preJoin.remove(event.getUser());
         players.remove(event.getUser());
     }
 

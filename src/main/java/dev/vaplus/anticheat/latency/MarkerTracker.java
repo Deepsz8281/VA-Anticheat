@@ -56,6 +56,7 @@ public final class MarkerTracker implements AckTracker {
     private int taskEnd;
 
     private long anomalyCount;
+    private long skippedCount;
     private volatile long rttNanos = -1L;
     private volatile long smoothedRttNanos = -1L;
     private volatile int pendingSnapshot;
@@ -135,6 +136,7 @@ public final class MarkerTracker implements AckTracker {
                 // Skipped marker: vanilla clients answer strictly in order, so this indicates a
                 // modified client. The later echo still proves the earlier packets were processed.
                 anomalyCount++;
+                skippedCount++;
                 acknowledge(sequence, -1L);
             } else {
                 acknowledge(sequence, now - sentAt);
@@ -240,6 +242,11 @@ public final class MarkerTracker implements AckTracker {
     @Override
     public long anomalies() {
         return anomalyCount;
+    }
+
+    /** Markers a later echo skipped (answered out of order); vanilla answers strictly in order. */
+    public long skipped() {
+        return skippedCount;
     }
 
     private void acknowledge(long sequence, long rtt) {

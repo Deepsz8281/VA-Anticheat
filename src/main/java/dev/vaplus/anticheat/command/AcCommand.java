@@ -145,6 +145,7 @@ public final class AcCommand implements CommandExecutor, TabCompleter {
         String[] pairs = {
                 "player", data.name(),
                 "version", data.clientVersion().getReleaseName(),
+                "brand", data.clientBrand(),
                 "ping", formatPing(data.acks().rttMillis()),
                 "ping_avg", formatPing(data.acks().smoothedRttMillis()),
                 "pending", Integer.toString(data.acks().pendingCount()),
