@@ -36,6 +36,18 @@ Every check can be tuned or disabled under `checks.<id>` in `config.yml`.
 2. Put it and PacketEvents into the server's `plugins/` folder.
 3. Start the server and edit `plugins/VAPlus/config.yml` and `messages.yml`.
 
+The full walkthrough (permissions, database, updating, troubleshooting) is in the
+[Installation Guide](docs/INSTALLATION.md).
+
+## Documentation
+
+| Page | Contents |
+|---|---|
+| [Installation Guide](docs/INSTALLATION.md) | Requirements, installing, first start, database, updating, troubleshooting |
+| [Configuration](docs/CONFIGURATION.md) | Global settings, per-check settings, punishments, anti health indicator, storage |
+| [Checks](docs/CHECKS.md) | All checks with id, category and what they detect |
+| [Commands and Permissions](docs/COMMANDS.md) | `/ac` sub-commands and permission nodes |
+
 ## Building
 
 Requires Java 21 and Maven 3.9+.
@@ -56,6 +68,7 @@ The jar is written to `target/`.
 | `/ac info <player>` | Show a player's state and violations |
 | `/ac logs <player> [page]` | Show the violation log |
 | `/ac profile` | Show check timings |
+| `/ac metrics` | Flags per check and engine state |
 | `/ac debug <check\|all> [player]` | Debug output of checks |
 | `/ac reload` | Reload `config.yml` and `messages.yml` |
 
@@ -66,6 +79,6 @@ Aliases: `/vaplus`, `/anticheat`.
 | Permission | Default | Description |
 |---|---|---|
 | `ac.alerts` | op | Receive alerts, view player info and logs |
-| `ac.admin` | op | Reload, profile and debug (includes `ac.alerts`) |
+| `ac.admin` | op | Reload, profile, metrics and debug (includes `ac.alerts`) |
 | `ac.bypass` | false | Exempt from all checks |
 | `ac.healthindicator.bypass` | false | See real health and equipment of other entities |
