@@ -560,6 +560,11 @@ checks:
       interpolation-ticks: 4
       # View turn (degrees) between two client ticks above which the hit is not judged. Max 90
       max-turn-degrees: 12.0
+      # Window (Meteor-style hitbox expansion): window-misses impossible hits within the last
+      # window-hits judged hits are a violation, even if most hits land on the body.
+      check-window: true
+      window-hits: 20
+      window-misses: 3
   # Spider: rising along a wall (client-reported horizontal collision) faster than gravity allows,
   # without a climbable, liquid or other lift source in the player's box. Experimental.
   spider:

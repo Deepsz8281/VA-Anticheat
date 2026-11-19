@@ -464,4 +464,38 @@ class HitboxCheckTest {
         fixture.attacks(60f, 0f, 10);
         assertEquals(0, fixture.check().judgedSamples());
     }
+
+    @Test
+    @DisplayName("Meteor-style expansion: mostly body hits with a few impossible edge hits flags via the window")
+    void sporadicExpansion() {
+        Fixture fixture = fixture(true);
+        fixture.prime();
+        for (int round = 0; round < 6; round++) {
+            fixture.idle(0f, 1);
+            fixture.attacks(0f, 0f, 4);
+            // 0.45 beside the box: impossible without a ~0.5 expansion (turned there a tick earlier)
+            fixture.idle(yawFor(0.75), 1);
+            fixture.attacks(yawFor(0.75), 0f, 1);
+        }
+        assertTrue(fixture.check().windowFlags() >= 1, fixture::details);
+        String details = fixture.harness().alerts.alerts().get(0).details();
+        assertTrue(details.startsWith("pattern"), details);
+        double expansion = Double.parseDouble(details.replaceAll(".*expansion>=([0-9.]+).*", "$1"));
+        assertTrue(expansion > 0.2 && expansion <= 0.45, details);
+    }
+
+    @Test
+    @DisplayName("two impossible hits spread over many body hits do not reach the window limit")
+    void windowNeedsSeveralMisses() {
+        Fixture fixture = fixture(true);
+        fixture.prime();
+        for (int round = 0; round < 2; round++) {
+            fixture.idle(yawFor(0.75), 1);
+            fixture.attacks(yawFor(0.75), 0f, 1);
+            fixture.idle(0f, 1);
+            fixture.attacks(0f, 0f, 25);
+        }
+        assertEquals(0, fixture.check().windowFlags(), fixture::details);
+        assertEquals(0, fixture.flags(), fixture::details);
+    }
 }

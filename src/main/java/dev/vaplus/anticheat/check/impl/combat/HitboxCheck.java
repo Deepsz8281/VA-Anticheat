@@ -67,6 +67,16 @@ import java.util.List;
  * {@value #MIN_JUDGED_DISTANCE} or farther than {@value #MAX_JUDGED_DISTANCE} blocks (reach is the
  * other check's business) and clients without tick-end packets (before 1.21.2).
  *
+ * <h2>Window signal (Meteor-style "Hitboxes")</h2>
+ * Hitbox modules such as Meteor's "Hitboxes" only matter when the crosshair is beside the real box;
+ * most hits of such a player still land on the body and relieve the buffer above. So every judged
+ * hit is also kept in a window of the last {@code window-hits} judged hits: {@code window-misses}
+ * impossible hits inside it are a violation of their own, whatever the buffer says. The alert
+ * carries the largest measured growth: a lower bound of the expansion the client uses (the
+ * candidate ranges always favour the player). Legitimate
+ * play produces no impossible hit at all (every uncertainty is folded into the candidate range), so
+ * a few of them in a short window are not noise.
+ *
  * <h2>Known bypasses</h2>
  * Expansions below {@code min-miss} plus the eye and lag ranges; holding back acknowledgements
  * widens the lag window (and beyond {@value #MAX_LAG_TICKS} ticks disables the check); the first
@@ -94,6 +104,11 @@ public final class HitboxCheck extends Check implements CombatCheck, ClientTickC
     public static final int DEFAULT_INTERPOLATION_TICKS = 4;
     /** View turn (degrees) between two ticks above which the exact crosshair is unknown. */
     public static final double DEFAULT_MAX_TURN_DEGREES = 12.0;
+    /** Judged hits kept in the window signal. */
+    public static final int DEFAULT_WINDOW_HITS = 20;
+    /** Impossible hits inside the window that are a violation. */
+    public static final int DEFAULT_WINDOW_MISSES = 3;
+    static final int MAX_WINDOW = 64;
 
     static final int MAX_LAG_TICKS = 16;
     static final double MIN_JUDGED_DISTANCE = 1.0;
@@ -194,6 +209,17 @@ public final class HitboxCheck extends Check implements CombatCheck, ClientTickC
     private double minMiss = DEFAULT_MIN_MISS;
     private int interpolationTicks = DEFAULT_INTERPOLATION_TICKS;
     private double maxTurnDegrees = DEFAULT_MAX_TURN_DEGREES;
+    private boolean checkWindow = true;
+    private int windowHits = DEFAULT_WINDOW_HITS;
+    private int windowMisses = DEFAULT_WINDOW_MISSES;
+
+    // window signal: impossible-hit flags and their measured growth, ring of judged hits
+    private final boolean[] windowMiss = new boolean[MAX_WINDOW];
+    private final double[] windowNeed = new double[MAX_WINDOW];
+    private int windowHead;
+    private int windowSize;
+    private int windowMissCount;
+    private int windowFlags;
 
     public HitboxCheck(PlayerData player, ComponentKey<NearbyPlayers> trackedKey) {
         super(player, DESCRIPTOR);
@@ -212,6 +238,12 @@ public final class HitboxCheck extends Check implements CombatCheck, ClientTickC
                 CombatOptions.atLeast(options, "interpolation-ticks", DEFAULT_INTERPOLATION_TICKS, 1));
         maxTurnDegrees = Math.min(90.0,
                 CombatOptions.positive(options, "max-turn-degrees", DEFAULT_MAX_TURN_DEGREES));
+        checkWindow = options.getBoolean("check-window", true);
+        int hits = options.getInt("window-hits", DEFAULT_WINDOW_HITS);
+        windowHits = hits >= 5 && hits <= MAX_WINDOW ? hits : DEFAULT_WINDOW_HITS;
+        int misses = options.getInt("window-misses", DEFAULT_WINDOW_MISSES);
+        windowMisses = misses >= 1 && misses <= windowHits ? misses : Math.min(DEFAULT_WINDOW_MISSES, windowHits);
+        clearWindow();
     }
 
     @Override
@@ -221,6 +253,7 @@ public final class HitboxCheck extends Check implements CombatCheck, ClientTickC
         attackThisTick = false;
         hitSamples = 0;
         missSamples = 0;
+        clearWindow();
     }
 
     @Override
@@ -535,15 +568,20 @@ public final class HitboxCheck extends Check implements CombatCheck, ClientTickC
             hitSamples++;
             lastMiss = 0.0;
             lowerBuffer();
+            recordWindow(false, 0.0, slot, lag);
             return;
         }
         double need = missDistance();
         lastMiss = need;
         if (need <= minMiss) {
             // Close to the box but beyond the tolerance: neither evidence nor proof.
+            recordWindow(false, 0.0, slot, lag);
             return;
         }
         missSamples++;
+        if (recordWindow(true, need, slot, lag)) {
+            return;
+        }
         if (debugging()) {
             debug("entity=" + targetId[slot] + " miss=" + CombatOptions.number(need)
                     + " lag=" + lag + "t buffer=" + CombatOptions.number(buffer()));
@@ -558,7 +596,65 @@ public final class HitboxCheck extends Check implements CombatCheck, ClientTickC
             resetBuffer();
             hitSamples = 0;
             missSamples = 0;
+            clearWindow();
         }
+    }
+
+    /**
+     * Adds one judged hit to the window; returns {@code true} when the window produced a violation
+     * (the buffer path is then skipped for this hit).
+     */
+    private boolean recordWindow(boolean miss, double need, int slot, int lag) {
+        if (!checkWindow) {
+            return false;
+        }
+        if (windowSize == windowHits) {
+            int oldest = (windowHead - windowHits + MAX_WINDOW) % MAX_WINDOW;
+            if (windowMiss[oldest]) {
+                windowMissCount--;
+            }
+        } else {
+            windowSize++;
+        }
+        windowMiss[windowHead] = miss;
+        windowNeed[windowHead] = need;
+        windowHead = (windowHead + 1) % MAX_WINDOW;
+        if (miss) {
+            windowMissCount++;
+        }
+        if (!miss || windowMissCount < windowMisses) {
+            return false;
+        }
+        double largest = 0.0;
+        for (int i = 0; i < windowSize; i++) {
+            int index = (windowHead - 1 - i + MAX_WINDOW) % MAX_WINDOW;
+            if (windowMiss[index]) {
+                largest = Math.max(largest, windowNeed[index]);
+            }
+        }
+        String details = "pattern entity=" + targetId[slot]
+                + " misses=" + windowMissCount + "/" + windowSize
+                + " expansion>=" + CombatOptions.number(largest)
+                + " limit=" + CombatOptions.number(minMiss)
+                + " lag=" + lag + "t";
+        windowFlags++;
+        clearWindow();
+        resetBuffer();
+        hitSamples = 0;
+        missSamples = 0;
+        violation(details);
+        return true;
+    }
+
+    private void clearWindow() {
+        windowHead = 0;
+        windowSize = 0;
+        windowMissCount = 0;
+    }
+
+    /** Violations raised by the window signal (tests, diagnostics). */
+    int windowFlags() {
+        return windowFlags;
     }
 
     /** Smallest box growth (capped at {@link #MEASURE_CAP}) for which some candidate ray hits. */

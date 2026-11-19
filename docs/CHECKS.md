@@ -38,7 +38,7 @@ Default profile `combat`. Combat checks only judge targets the server actually s
 | Id | Name | Detects | Notes |
 |---|---|---|---|
 | `reach` | Reach | Attacks from beyond vanilla reach | |
-| `hitbox` | Hitbox | Hits whose target box the look ray does not touch | experimental |
+| `hitbox` | Hitbox | Hits whose target box the look ray does not touch (hitbox expansion such as Meteor's Hitboxes, also when most hits land normally) | experimental, 1.21.2+ |
 | `killaura` | Killaura | Attacks outside the look direction, while using items, in GUIs or without swing | experimental |
 | `aim` | Aim | Rotations off the mouse grid, locked on the hitbox centre or snapping back | experimental |
 | `silentrotation` | SilentRotation | Sent rotations that differ from the camera | experimental, movement signal 1.21.2+ |
