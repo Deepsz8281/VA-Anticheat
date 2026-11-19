@@ -1,6 +1,6 @@
 # Handoff TODO (Phase 2, Runde 3 abgeschlossen — Runde 4 offen) — for the next AI
 
-Project: VA+ / VAPlus anticheat, `C:\Users\fynnl\Desktop\VA+ Anticheat`. Read `docs/ARCHITECTURE.md` and
+Project: VA+ / VAPlus anticheat (repository root). Read `docs/ARCHITECTURE.md` and
 `docs/PHASE2-BRIEF.md` first, then `docs/research/version-notes.md`. Phases are run strictly one at a time.
 
 Model note (user rule, replaces the old "one agent at a time / Sonnet-Opus" rules): the user now allows
@@ -16,16 +16,15 @@ usage-limit errors the GLM agent falls back to **GPT 6.1 Sol** (unchanged fallba
   UNCONFIRMED and are never stated as facts.
 - Foreign build/test errors: report them, do not fix them.
 
-## Build (PowerShell; only Java 17 is on PATH, so set JAVA_HOME explicitly)
+## Build (Java 21 and Maven 3.9+ required)
 
-```powershell
-cd "C:\Users\fynnl\Desktop\VA+ Anticheat"
-$env:JAVA_HOME = "C:\Program Files\Java\jdk-21"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-& "C:\Users\fynnl\.m2\wrapper\dists\apache-maven-3.9.6-bin\3311e1d4\apache-maven-3.9.6\bin\mvn.cmd" -B clean verify
+```sh
+git clone https://github.com/Deepsz8281/VA-Anticheat.git
+cd VA-Anticheat
+mvn -B clean verify
 ```
 
-Artifacts: jar at `target\VAPlus-0.1.0-SNAPSHOT.jar` (Java 21 bytecode, contains `config.yml`,
+Artifacts: jar at `target/VAPlus-0.1.0-SNAPSHOT.jar` (Java 21 bytecode, contains `config.yml`,
 `messages.yml`, `plugin.yml`; `folia-supported: true`, `depend: [packetevents]`).
 
 ## Current state (2026-11-13): PHASE 2, ROUND 3 DONE — `mvn -B clean verify`: 695 tests green

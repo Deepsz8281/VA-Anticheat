@@ -1,6 +1,6 @@
 # Phase 2 Brief — Simulation (LEAD-Vertrag, Runde 1)
 
-Gültig für: `C:\Users\fynnl\Desktop\VA+ Anticheat` nach abgeschlossenem Phase-1-Review (397 Tests grün,
+Gültig für: dieses Repository nach abgeschlossenem Phase-1-Review (397 Tests grün,
 Messages-Reload prepare/apply-atomar). Bindend für alle Phase-2-Agenten; Abweichungen nur über den LEAD.
 Belege: `docs/ARCHITECTURE.md`, `docs/HANDOFF-TODO.md` (Deferred-Liste), `docs/research/version-notes.md`.
 

@@ -6,10 +6,10 @@ exists so the next run is reproducible and its output can be archived with the b
 
 ## 0. Build and install
 
-```powershell
-# PowerShell, Java 21 (see HANDOFF-TODO.md for the full command)
-& "C:\Users\fynnl\.m2\wrapper\dists\apache-maven-3.9.6-bin\3311e1d4\apache-maven-3.9.6\bin\mvn.cmd" -B package -DskipTests
-Copy-Item target\VAPlus-0.1.0-SNAPSHOT.jar <server>\plugins\
+```sh
+# Java 21 and Maven 3.9+
+mvn -B package -DskipTests
+cp target/VAPlus-0.1.0-SNAPSHOT.jar <server>/plugins/
 ```
 
 `packetevents` must be installed (`depend: [packetevents]`). Start the server once and keep
