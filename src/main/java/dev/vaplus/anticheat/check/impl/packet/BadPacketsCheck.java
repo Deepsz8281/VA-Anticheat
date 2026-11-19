@@ -85,6 +85,12 @@ import java.util.Locale;
  *       moved less than the 0.0002 block send threshold. Experimental.</li>
  *   <li>{@code input-actions} (X, 1.21.2+ clients): two sprint state changes in one client tick.</li>
  *   <li>{@code duplicate-input} (Z, 1.21.2+ clients): two player-input packets in one client tick.</li>
+ *   <li>{@code duplicate-look} (Grim AimDuplicateLook, 1.21.2+ clients): a rotation packet that
+ *       repeats the previous rotation exactly. The client only sends its rotation when it changed;
+ *       teleport answers, server-set rotations and riders are excused.</li>
+ *   <li>{@code yaw-wrap} (Grim AimModulo360): a yaw jump of more than 320 degrees right after a
+ *       calm tick (below 30 degrees), while the yaw stays within +-360. Aim modules that wrap the
+ *       yaw instead of turning produce it; a mouse does not.</li>
  * </ul>
  * Not ported: Grim's B and N (empty classes there; ignored teleports are held at the safe position
  * by the movement gate here), P (invalid window clicks: the {@code crasher} check), S and U (packets
@@ -196,6 +202,12 @@ public final class BadPacketsCheck extends Check implements PacketCheck, BlockCh
     private int ticksSincePosition = Integer.MAX_VALUE / 2;
     private boolean slowMoveBaseline;
     private int teleportSkip;
+    // aim
+    private boolean checkDuplicateLook = true;
+    private boolean checkYawWrap = true;
+    private float lastDeltaYaw;
+    private long rotationSetAtNanos = Long.MIN_VALUE / 2;
+    private boolean rotationAfterTeleport;
     // X, Z
     private int sprintActionsThisTick;
     private int inputsThisTick;
@@ -233,6 +245,8 @@ public final class BadPacketsCheck extends Check implements PacketCheck, BlockCh
         checkSlowMove = options.getBoolean("check-slow-move", true);
         checkInputActions = options.getBoolean("check-input-actions", true);
         checkDuplicateInput = options.getBoolean("check-duplicate-input", true);
+        checkDuplicateLook = options.getBoolean("check-duplicate-look", true);
+        checkYawWrap = options.getBoolean("check-yaw-wrap", true);
     }
 
     @Override
@@ -289,16 +303,17 @@ public final class BadPacketsCheck extends Check implements PacketCheck, BlockCh
 
     private void onMovementPacket(PacketReceiveEvent event, boolean hasPosition) {
         WrapperPlayClientPlayerFlying packet = null;
-        if (checkPitch && event.getPacketType() != PacketType.Play.Client.PLAYER_FLYING
+        if (event.getPacketType() != PacketType.Play.Client.PLAYER_FLYING
                 && event.getPacketType() != PacketType.Play.Client.PLAYER_POSITION) {
             packet = new WrapperPlayClientPlayerFlying(event);
             Location location = packet.getLocation();
             float pitch = location.getPitch();
             float yaw = location.getYaw();
-            if (!Float.isFinite(pitch) || !Float.isFinite(yaw) || pitch < -90.0F || pitch > 90.0F) {
+            if (checkPitch && (!Float.isFinite(pitch) || !Float.isFinite(yaw) || pitch < -90.0F || pitch > 90.0F)) {
                 flag(SURE, "impossible rotation pitch=" + pitch + " yaw=" + yaw);
                 return;
             }
+            onRotation(yaw, pitch);
         }
         countRate();
         if (hasPosition) {
@@ -385,7 +400,29 @@ public final class BadPacketsCheck extends Check implements PacketCheck, BlockCh
         }
     }
 
+    /** A rotation-bearing movement packet (aim signals). Called before the pipeline applies it. */
+    void onRotation(float yaw, float pitch) {
+        MovementState movement = player.movement();
+        boolean excused = rotationAfterTeleport || player.vehicle().inVehicle() || !movement.rotationKnown()
+                || isExempt() || player.exemptions().isActive(ExemptionCause.VEHICLE)
+                || (player.context().time().nanoTime() - rotationSetAtNanos) / 1_000_000L <= graceMillis();
+        rotationAfterTeleport = false;
+        float deltaYaw = yaw - movement.yaw();
+        if (excused) {
+            lastDeltaYaw = deltaYaw;
+            return;
+        }
+        if (checkDuplicateLook && player.tickEndMode() && yaw == movement.yaw() && pitch == movement.pitch()) {
+            flag(SURE, "duplicate-look yaw=" + yaw + " pitch=" + pitch);
+        }
+        if (checkYawWrap && Math.abs(yaw) < 360.0F && Math.abs(deltaYaw) > 320.0F && Math.abs(lastDeltaYaw) < 30.0F) {
+            flag(LIKELY, "yaw-wrap delta=" + deltaYaw + " previous=" + lastDeltaYaw);
+        }
+        lastDeltaYaw = deltaYaw;
+    }
+
     void onTeleportConfirm() {
+        rotationAfterTeleport = true;
         // the confirming position and the one after it are compared against a position the
         // client does not use as its own reference
         teleportSkip = 2;
@@ -555,7 +592,10 @@ public final class BadPacketsCheck extends Check implements PacketCheck, BlockCh
     @Override
     public void onPacketSend(PacketSendEvent event) {
         PacketTypeCommon type = event.getPacketType();
-        if (type == PacketType.Play.Server.KEEP_ALIVE) {
+        if (type == PacketType.Play.Server.PLAYER_ROTATION || type == PacketType.Play.Server.FACE_PLAYER
+                || type == PacketType.Play.Server.PLAYER_POSITION_AND_LOOK) {
+            onRotationSet();
+        } else if (type == PacketType.Play.Server.KEEP_ALIVE) {
             onKeepAliveSent(new WrapperPlayServerKeepAlive(event).getId());
         } else if (type == PacketType.Play.Server.JOIN_GAME) {
             onJoin(new WrapperPlayServerJoinGame(event).getEntityId());
@@ -574,6 +614,11 @@ public final class BadPacketsCheck extends Check implements PacketCheck, BlockCh
                 onOwnMetadata(packet.getEntityMetadata());
             }
         }
+    }
+
+    /** The server turned the player (teleport, set rotation, face): the next rotations may repeat. */
+    void onRotationSet() {
+        rotationSetAtNanos = player.context().time().nanoTime();
     }
 
     void onKeepAliveSent(long id) {

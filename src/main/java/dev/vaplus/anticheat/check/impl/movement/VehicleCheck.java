@@ -7,6 +7,9 @@ import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
 import com.github.retrooper.packetevents.util.Vector3d;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientEntityAction;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientSteerBoat;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientSteerVehicle;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientVehicleMove;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityPositionSync;
@@ -26,6 +29,7 @@ import dev.vaplus.anticheat.check.PacketCheck;
 import dev.vaplus.anticheat.module.ComponentKey;
 import dev.vaplus.anticheat.player.PlayerData;
 import dev.vaplus.anticheat.player.state.ExemptionCause;
+import dev.vaplus.anticheat.player.state.PoseState;
 import dev.vaplus.anticheat.world.mirror.BlockProperties;
 import dev.vaplus.anticheat.world.mirror.BlockSnapshot;
 import dev.vaplus.anticheat.world.mirror.WorldMirror;
@@ -57,6 +61,10 @@ import java.util.Locale;
  *       source, a bubble column launch of at most 0.7 blocks/tick, gives roughly 5 blocks).
  *       Horses and other mounts use only the rise bound ({@code max-jump-height} for horses).</li>
  * </ul>
+ * <p>Packet sanity ({@code check-input-packets}, Grim VehicleA/B/D/E/F): steering input beyond
+ * +-0.98 or non-finite, steering without a vehicle (pre-1.21.2 servers), a mount jump without a
+ * jumping mount, paddle packets outside a boat, and paddle states that contradict the keys the
+ * 1.21.2+ input packet reports. Mount and dismount transitions are never judged.
  * Skipped: exempt players, unknown chunks/blocks, the first {@code mount-grace-ticks} after
  * mounting, and {@code sync-grace-millis} (plus twice the round trip) after a server correction
  * ({@code VEHICLE_MOVE}, a teleport that moves the vehicle away from its reported position, or a
@@ -117,6 +125,9 @@ public final class VehicleCheck extends Check implements PacketCheck, OutboundPa
     private final ComponentKey<WorldMirror> worldKey;
 
     private double maxBoatSpeed = DEFAULT_MAX_BOAT_SPEED;
+    /** Vanilla steering impulse magnitude when a key is held. */
+    static final float MAX_STEER = 0.98F;
+    private boolean checkInputPackets = true;
     private double maxMountSpeed = DEFAULT_MAX_MOUNT_SPEED;
     private int iceGraceTicks = DEFAULT_ICE_GRACE_TICKS;
     private int maxHoverTicks = DEFAULT_MAX_HOVER_TICKS;
@@ -160,6 +171,7 @@ public final class VehicleCheck extends Check implements PacketCheck, OutboundPa
         CheckOptions options = settings.options();
         maxBoatSpeed = positive(options.getDouble("max-boat-speed", DEFAULT_MAX_BOAT_SPEED),
                 DEFAULT_MAX_BOAT_SPEED, 20.0);
+        checkInputPackets = options.getBoolean("check-input-packets", true);
         maxMountSpeed = positive(options.getDouble("max-mount-speed", DEFAULT_MAX_MOUNT_SPEED),
                 DEFAULT_MAX_MOUNT_SPEED, 20.0);
         maxAirRise = positive(options.getDouble("max-air-rise", DEFAULT_MAX_AIR_RISE),
@@ -199,11 +211,79 @@ public final class VehicleCheck extends Check implements PacketCheck, OutboundPa
 
     @Override
     public void onPacketReceive(PacketReceiveEvent event) {
-        if (event.getPacketType() != PacketType.Play.Client.VEHICLE_MOVE) {
+        PacketTypeCommon type = event.getPacketType();
+        if (type == PacketType.Play.Client.VEHICLE_MOVE) {
+            Vector3d position = new WrapperPlayClientVehicleMove(event).getPosition();
+            onVehicleMove(position.getX(), position.getY(), position.getZ());
+        } else if (type == PacketType.Play.Client.STEER_VEHICLE) {
+            WrapperPlayClientSteerVehicle packet = new WrapperPlayClientSteerVehicle(event);
+            onSteerVehicle(packet.getForward(), packet.getSideways());
+        } else if (type == PacketType.Play.Client.STEER_BOAT) {
+            WrapperPlayClientSteerBoat packet = new WrapperPlayClientSteerBoat(event);
+            onSteerBoat(packet.isLeftPaddleTurning(), packet.isRightPaddleTurning());
+        } else if (type == PacketType.Play.Client.ENTITY_ACTION) {
+            if (new WrapperPlayClientEntityAction(event).getAction()
+                    == WrapperPlayClientEntityAction.Action.START_JUMPING_WITH_HORSE) {
+                onMountJump();
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- vehicle packet sanity
+
+    /** Whether the riding state is settled (no mount or dismount in flight). */
+    private boolean ridingSettled() {
+        return !isExempt() && !player.exemptions().isActive(ExemptionCause.VEHICLE);
+    }
+
+    /** Pre-1.21.2 steering input (Grim VehicleA / VehicleB). Vanilla sends at most +-0.98. */
+    void onSteerVehicle(float forward, float sideways) {
+        if (checkInputPackets && (!Float.isFinite(forward) || !Float.isFinite(sideways)
+                || Math.abs(forward) > MAX_STEER || Math.abs(sideways) > MAX_STEER)) {
+            packetViolation("steer-input forward=" + forward + " sideways=" + sideways);
             return;
         }
-        Vector3d position = new WrapperPlayClientVehicleMove(event).getPosition();
-        onVehicleMove(position.getX(), position.getY(), position.getZ());
+        if (checkInputPackets && !player.vehicle().inVehicle() && ridingSettled()) {
+            packetViolation("steer-without-vehicle");
+        }
+    }
+
+    /** Mount jump (Grim VehicleD): only horses, camels and other jumping mounts send it. */
+    void onMountJump() {
+        if (!checkInputPackets || !ridingSettled()) {
+            return;
+        }
+        if (!player.vehicle().inVehicle() || (kind == KIND_BOAT && vehicleId == player.vehicle().vehicleEntityId())) {
+            packetViolation("mount-jump vehicle=" + (player.vehicle().inVehicle() ? kindName() : "none"));
+        }
+    }
+
+    /** Boat paddles (Grim VehicleE / VehicleF). */
+    void onSteerBoat(boolean left, boolean right) {
+        if (!checkInputPackets || !ridingSettled()) {
+            return;
+        }
+        boolean inBoat = player.vehicle().inVehicle() && kind == KIND_BOAT
+                && vehicleId == player.vehicle().vehicleEntityId();
+        if (!player.vehicle().inVehicle() || (kind != KIND_NONE && !inBoat)) {
+            packetViolation("paddle-without-boat");
+            return;
+        }
+        PoseState pose = player.pose();
+        if (!inBoat || !player.tickEndMode() || !pose.inputKnown()) {
+            return;
+        }
+        // Boat#controlBoat: left paddle = (right && !left) || forward, right paddle = (left && !right) || forward
+        boolean expectedLeft = pose.forward() || (pose.right() && !pose.left());
+        boolean expectedRight = pose.forward() || (pose.left() && !pose.right());
+        if (left != expectedLeft || right != expectedRight) {
+            packetViolation("paddle-mismatch sent=" + left + "/" + right + " expected=" + expectedLeft + "/" + expectedRight);
+        }
+    }
+
+    /** Packet signals are deterministic: no buffer. */
+    private void packetViolation(String details) {
+        violation(details);
     }
 
     @Override
@@ -521,6 +601,12 @@ public final class VehicleCheck extends Check implements PacketCheck, OutboundPa
             return KIND_OTHER;
         }
         return KIND_NONE;
+    }
+
+    /** Whether the player currently rides a boat (other checks, e.g. multiactions rowing). */
+    public boolean ridingBoat() {
+        return kind == KIND_BOAT && vehicleId >= 0 && player.vehicle().inVehicle()
+                && vehicleId == player.vehicle().vehicleEntityId();
     }
 
     private String kindName() {

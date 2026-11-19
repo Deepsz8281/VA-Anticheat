@@ -1,7 +1,9 @@
 package dev.vaplus.anticheat.check.impl.packet;
 
+import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.protocol.packettype.PacketTypeCommon;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTickingState;
 import dev.vaplus.anticheat.check.Check;
 import dev.vaplus.anticheat.check.CheckCategory;
@@ -11,6 +13,7 @@ import dev.vaplus.anticheat.check.CheckOptions;
 import dev.vaplus.anticheat.check.CheckSettings;
 import dev.vaplus.anticheat.check.ClientTickCheck;
 import dev.vaplus.anticheat.check.OutboundPacketCheck;
+import dev.vaplus.anticheat.check.PacketCheck;
 import dev.vaplus.anticheat.latency.MarkerTracker;
 import dev.vaplus.anticheat.movement.MovementUpdate;
 import dev.vaplus.anticheat.player.PlayerData;
@@ -20,6 +23,20 @@ import java.util.Locale;
 
 /**
  * Timer: a client whose game clock runs faster than real time (game-speed hacks).
+ *
+ * <p>Additional signals (Grim equivalents in brackets):
+ * <ul>
+ *   <li>{@code tick-order} (TickTimer / VehicleTimer, 1.21.2+ clients): more than one movement
+ *       packet, or more than one vehicle move, inside one client tick. Vanilla sends at most one of
+ *       each per tick; the answer to a server teleport or vehicle correction is the only extra one.</li>
+ *   <li>{@code negative} (NegativeTimer, 1.21.2+ clients): the client clock falls more than
+ *       {@code negative-drift-millis} behind the time the client provably reached (its newest marker
+ *       answer): it answers pings in real time but ticks slower. Experimental.</li>
+ *   <li>{@code ping-abuse-limit-millis} (TimerLimit): while ticks keep arriving but marker answers
+ *       do not, the proven client time is never taken as older than this, so withholding answers
+ *       banks at most this much time. After a real stall (no packets at all for 500 ms) the limit
+ *       waits for the next answer, so a lag burst stays lag.</li>
+ * </ul>
  *
  * <p>The check keeps a <em>client clock</em>: every client tick advances it by one tick length
  * (50 ms at the vanilla rate). A tick cannot arrive before it happened, so for an honest client
@@ -41,7 +58,7 @@ import java.util.Locale;
  * outbound ticking-state packet: a faster rate applies at once, a slower one only after the client
  * acknowledged it.
  */
-public final class TimerCheck extends Check implements ClientTickCheck, OutboundPacketCheck {
+public final class TimerCheck extends Check implements ClientTickCheck, OutboundPacketCheck, PacketCheck {
 
     public static final double DEFAULT_CLOCK_DRIFT_MILLIS = 120.0;
     public static final float VANILLA_TICK_RATE = 20.0F;
@@ -62,6 +79,24 @@ public final class TimerCheck extends Check implements ClientTickCheck, Outbound
             .build();
 
     private long driftNanos = (long) (DEFAULT_CLOCK_DRIFT_MILLIS * NANOS_PER_MILLI);
+    public static final long DEFAULT_NEGATIVE_DRIFT_MILLIS = 1200L;
+    public static final long DEFAULT_PING_ABUSE_LIMIT_MILLIS = 1000L;
+    private boolean checkTickOrder = true;
+    private boolean checkNegative = true;
+    private long negativeDriftNanos = DEFAULT_NEGATIVE_DRIFT_MILLIS * NANOS_PER_MILLI;
+    /** Negative = no limit. */
+    private long pingAbuseLimitNanos = DEFAULT_PING_ABUSE_LIMIT_MILLIS * NANOS_PER_MILLI;
+    private int movementPacketsThisTick;
+    private int vehicleMovesThisTick;
+    private boolean teleportAnswerPending;
+    private int vehicleCorrections;
+    /** Ticks further apart than this are a stall (lag), not withheld marker answers. */
+    static final long STALL_GAP_NANOS = 500L * 1_000_000L;
+    private long lastTickWallNanos;
+    /** Proven client time at the last stall; the limit is off until a newer answer arrives. */
+    private long stallProvenTime = Long.MIN_VALUE;
+    /** Clock of the negative signal: never pulled up, so a slow client falls behind it. 0 = unset. */
+    private long negativeClock;
 
     /** Estimated client time in the server's {@code nanoTime} domain; 0 = not anchored. */
     private long clock;
@@ -84,6 +119,71 @@ public final class TimerCheck extends Check implements ClientTickCheck, Outbound
             drift = DEFAULT_CLOCK_DRIFT_MILLIS;
         }
         driftNanos = (long) (drift * NANOS_PER_MILLI);
+        checkTickOrder = options.getBoolean("check-tick-order", true);
+        checkNegative = options.getBoolean("check-negative", true);
+        long negative = options.getInt("negative-drift-millis", (int) DEFAULT_NEGATIVE_DRIFT_MILLIS);
+        negativeDriftNanos = (negative >= 200L && negative <= 30_000L ? negative : DEFAULT_NEGATIVE_DRIFT_MILLIS)
+                * NANOS_PER_MILLI;
+        long limit = options.getInt("ping-abuse-limit-millis", (int) DEFAULT_PING_ABUSE_LIMIT_MILLIS);
+        pingAbuseLimitNanos = limit < 0 ? -1L : Math.max(200L, Math.min(60_000L, limit)) * NANOS_PER_MILLI;
+    }
+
+    // ------------------------------------------------------------------ tick order
+
+    @Override
+    public void onPacketReceive(PacketReceiveEvent event) {
+        PacketTypeCommon type = event.getPacketType();
+        if (type == PacketType.Play.Client.PLAYER_FLYING || type == PacketType.Play.Client.PLAYER_POSITION
+                || type == PacketType.Play.Client.PLAYER_ROTATION
+                || type == PacketType.Play.Client.PLAYER_POSITION_AND_ROTATION) {
+            onMovementPacket();
+        } else if (type == PacketType.Play.Client.VEHICLE_MOVE) {
+            onVehicleMove();
+        } else if (type == PacketType.Play.Client.TELEPORT_CONFIRM) {
+            onTeleportConfirm();
+        }
+    }
+
+    /** The client confirmed a server teleport; its position+look answer follows at once. */
+    void onTeleportConfirm() {
+        teleportAnswerPending = true;
+    }
+
+    /** The server corrected the vehicle; the client answers with an extra vehicle move. */
+    void onServerVehicleCorrection() {
+        vehicleCorrections = Math.min(2, vehicleCorrections + 1);
+    }
+
+    /** A movement packet (tick-order). */
+    void onMovementPacket() {
+        if (teleportAnswerPending) {
+            // the position+look answering a server teleport is sent while handling that packet
+            teleportAnswerPending = false;
+            return;
+        }
+        if (++movementPacketsThisTick > 1) {
+            tickOrderViolation("movement packets=" + movementPacketsThisTick);
+        }
+    }
+
+    /** A client vehicle move (tick-order, Grim's VehicleTimer). */
+    void onVehicleMove() {
+        if (vehicleCorrections > 0) {
+            // the client answers a server vehicle correction at once
+            vehicleCorrections--;
+            return;
+        }
+        if (++vehicleMovesThisTick > 1) {
+            tickOrderViolation("vehicle moves=" + vehicleMovesThisTick);
+        }
+    }
+
+    private void tickOrderViolation(String what) {
+        if (!checkTickOrder || !player.tickEndMode() || isExempt()) {
+            return;
+        }
+        // deterministic: no buffer
+        violation("tick-order " + what + " in one client tick");
     }
 
     @Override
@@ -95,6 +195,10 @@ public final class TimerCheck extends Check implements ClientTickCheck, Outbound
 
     @Override
     public void onPacketSend(PacketSendEvent event) {
+        if (event.getPacketType() == PacketType.Play.Server.VEHICLE_MOVE) {
+            onServerVehicleCorrection();
+            return;
+        }
         if (event.getPacketType() != PacketType.Play.Server.TICKING_STATE) {
             return;
         }
@@ -130,6 +234,8 @@ public final class TimerCheck extends Check implements ClientTickCheck, Outbound
 
     @Override
     public void onClientTick() {
+        movementPacketsThisTick = 0;
+        vehicleMovesThisTick = 0;
         long now = player.context().time().nanoTime();
         if (isExempt()) {
             clock = 0L;
@@ -153,6 +259,17 @@ public final class TimerCheck extends Check implements ClientTickCheck, Outbound
         }
         clock += tickNanos;
         long provenClientTime = acks.lastAckedSentAtNanos();
+        if (lastTickWallNanos != 0L && now - lastTickWallNanos > STALL_GAP_NANOS) {
+            stallProvenTime = provenClientTime;
+            negativeClock = 0L;
+        }
+        lastTickWallNanos = now;
+        negative(now, provenClientTime);
+        if (pingAbuseLimitNanos > 0L && provenClientTime != 0L && provenClientTime != stallProvenTime
+                && now - provenClientTime > pingAbuseLimitNanos) {
+            // ticks keep coming while marker answers do not: bank at most the limit
+            provenClientTime = now - pingAbuseLimitNanos;
+        }
         if (provenClientTime != 0L && clock < provenClientTime - driftNanos) {
             clock = provenClientTime - driftNanos;
         }
@@ -175,6 +292,35 @@ public final class TimerCheck extends Check implements ClientTickCheck, Outbound
         if (debugging() && player.clientTicks() % 20 == 0) {
             debug("behind=" + (now - clock) / NANOS_PER_MILLI + "ms tick=" + tickNanos / NANOS_PER_MILLI
                     + "ms buffer=" + String.format(Locale.ROOT, "%.2f", buffer()));
+        }
+    }
+
+    /**
+     * Negative timer: a separate clock that advances one tick length per tick and is never pulled up.
+     * When it falls more than the drift behind the time the client provably reached, the client
+     * ticks slower than real time while answering markers. The clock restarts after every flag and
+     * after a stall (no ticks for 500 ms), so the flag rate follows the slowdown.
+     */
+    private void negative(long now, long provenClientTime) {
+        if (!checkNegative || !player.tickEndMode() || provenClientTime == 0L) {
+            negativeClock = 0L;
+            return;
+        }
+        if (negativeClock == 0L) {
+            negativeClock = provenClientTime - driftNanos;
+            return;
+        }
+        negativeClock += tickNanos;
+        if (negativeClock > now) {
+            negativeClock = now;
+        }
+        if (negativeClock < provenClientTime - negativeDriftNanos) {
+            long behind = provenClientTime - negativeClock;
+            negativeClock = provenClientTime - driftNanos;
+            if (raiseBuffer(1.5)) {
+                violation("negative behind=" + behind / NANOS_PER_MILLI + "ms (ticks slower than real time)");
+                resetBuffer();
+            }
         }
     }
 

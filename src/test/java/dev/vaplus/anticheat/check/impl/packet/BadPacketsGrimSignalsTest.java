@@ -285,4 +285,31 @@ class BadPacketsGrimSignalsTest {
         check.onPlayerInput();
         assertTrue(flagged("duplicate-input"), details()::toString);
     }
+    @Test
+    @DisplayName("Aim: an unchanged rotation flags (1.21.2+); after a teleport or server rotation it does not")
+    void duplicateLook() {
+        player.enableTickEndMode();
+        check.onRotation(10f, 5f);
+        player.movement().applyRotation(10f, 5f);
+        check.onTeleportConfirm();
+        check.onRotation(10f, 5f);
+        check.onRotationSet();
+        check.onRotation(10f, 5f);
+        assertEquals(0, flags(), details()::toString);
+        harness.time.advance(10, TimeUnit.SECONDS);
+        check.onRotation(10f, 5f);
+        assertTrue(flagged("duplicate-look"), details()::toString);
+    }
+
+    @Test
+    @DisplayName("Aim: a 330 degree yaw jump after a calm tick flags")
+    void yawWrap() {
+        for (int i = 0; i < 2; i++) {
+            player.movement().applyRotation(10f, 0f);
+            check.onRotation(15f, 0f);          // calm tick
+            player.movement().applyRotation(15f, 0f);
+            check.onRotation(-320f, 0f);        // 335 degree snap
+        }
+        assertTrue(flagged("yaw-wrap"), details()::toString);
+    }
 }

@@ -22,11 +22,12 @@ public final class PacketChecksModule implements AnticheatModule {
         context.registerCheck(CrasherCheck.DESCRIPTOR, CrasherCheck::new);
         context.registerCheck(PostCheck.DESCRIPTOR, PostCheck::new);
         context.registerCheck(BlinkCheck.DESCRIPTOR, BlinkCheck::new);
+        context.registerCheck(MultiActionsCheck.DESCRIPTOR, MultiActionsCheck::new);
     }
 
     /** Descriptors in registration order (tests, diagnostics). */
     public static CheckDescriptor[] descriptors() {
         return new CheckDescriptor[]{BadPacketsCheck.DESCRIPTOR, TimerCheck.DESCRIPTOR, CrasherCheck.DESCRIPTOR,
-                PostCheck.DESCRIPTOR, BlinkCheck.DESCRIPTOR};
+                PostCheck.DESCRIPTOR, BlinkCheck.DESCRIPTOR, MultiActionsCheck.DESCRIPTOR};
     }
 }

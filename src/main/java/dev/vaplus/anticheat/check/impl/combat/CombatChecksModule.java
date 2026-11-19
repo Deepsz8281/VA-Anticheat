@@ -50,6 +50,7 @@ public final class CombatChecksModule implements AnticheatModule {
                 player -> new CriticalsCheck(player, world, simulation.velocityKey()));
         context.registerCheck(MaceCheck.DESCRIPTOR, player -> new MaceCheck(player, simulation.velocityKey(), world));
         context.registerCheck(AimCheck.DESCRIPTOR, player -> new AimCheck(player, tracked));
+        context.registerCheck(InteractCheck.DESCRIPTOR, player -> new InteractCheck(player, tracked));
         context.registerCheck(SilentRotationCheck.DESCRIPTOR,
                 player -> new SilentRotationCheck(player, world, simulation.velocityKey()));
     }
@@ -59,6 +60,6 @@ public final class CombatChecksModule implements AnticheatModule {
         return new CheckDescriptor[]{ReachCheck.DESCRIPTOR, ThroughWallCheck.DESCRIPTOR,
                 KillauraCheck.DESCRIPTOR, AutoclickerCheck.DESCRIPTOR, TriggerbotCheck.DESCRIPTOR, HitboxCheck.DESCRIPTOR,
                 CriticalsCheck.DESCRIPTOR, MaceCheck.DESCRIPTOR, AimCheck.DESCRIPTOR,
-                SilentRotationCheck.DESCRIPTOR};
+                SilentRotationCheck.DESCRIPTOR, InteractCheck.DESCRIPTOR};
     }
 }

@@ -53,6 +53,7 @@ public final class VisibilityChecksModule implements AnticheatModule {
         context.registerCheck(FastUseCheck.DESCRIPTOR, FastUseCheck::new);
         context.registerCheck(NukerCheck.DESCRIPTOR, NukerCheck::new);
         context.registerCheck(BlockReachCheck.DESCRIPTOR, BlockReachCheck::new);
+        context.registerCheck(BreakingCheck.DESCRIPTOR, player -> new BreakingCheck(player, worldKey));
     }
 
     /** Component of tracked other players (tests, diagnostics). */
@@ -68,6 +69,6 @@ public final class VisibilityChecksModule implements AnticheatModule {
         return new CheckDescriptor[]{XrayCheck.DESCRIPTOR, FreecamCheck.DESCRIPTOR, EspCheck.DESCRIPTOR, FastPlaceCheck.DESCRIPTOR,
                 ScaffoldCheck.DESCRIPTOR, GhostHandCheck.DESCRIPTOR,
                 FastBreakCheck.DESCRIPTOR, FastUseCheck.DESCRIPTOR, NukerCheck.DESCRIPTOR,
-                BlockReachCheck.DESCRIPTOR};
+                BlockReachCheck.DESCRIPTOR, BreakingCheck.DESCRIPTOR};
     }
 }

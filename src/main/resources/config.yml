@@ -488,6 +488,10 @@ checks:
       check-input-actions: true
       # Z: two player-input packets in one client tick (1.21.2+ clients).
       check-duplicate-input: true
+      # Grim AimDuplicateLook (1.21.2+): a rotation packet repeating the previous rotation exactly.
+      check-duplicate-look: true
+      # Grim AimModulo360: a yaw jump above 320 degrees right after a calm tick.
+      check-yaw-wrap: true
   # Game-speed hacks: every client tick advances a client clock by one tick length; a clock that
   # overtakes real time means the client ticks too fast. Lag only delays packets and never flags.
   # /tick rate changes are followed automatically.
@@ -505,6 +509,38 @@ checks:
       # How far (milliseconds) the client clock may lag behind the newest acknowledged marker before
       # it is pulled forward. Larger values tolerate more jitter but let a client bank more ticks.
       clock-drift-millis: 120.0
+      # Tick order (Grim TickTimer/VehicleTimer, 1.21.2+): more than one movement packet or vehicle
+      # move inside one client tick (teleport and vehicle-correction answers excused).
+      check-tick-order: true
+      # Negative timer (Grim NegativeTimer, 1.21.2+): ticks fall this far behind the time the client
+      # provably reached while it keeps answering markers. Experimental.
+      check-negative: true
+      negative-drift-millis: 1200
+      # Timer limit (Grim TimerLimit): while ticks keep arriving but marker answers do not, at most
+      # this much time can be banked. -1 disables. A real stall (no packets at all) stays lag.
+      ping-abuse-limit-millis: 1000
+  # MultiActions: action combinations vanilla never sends (Grim MultiActions B/D/E/F/G). Experimental.
+  multiactions:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 2.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: packet
+    options:
+      # Digging / swinging while the server-confirmed item use is still active use-confirm-ticks later.
+      check-using-break: true
+      check-using-swing: true
+      use-confirm-ticks: 3
+      # Closing a container while movement keys are held or sprinting (1.21.2+).
+      check-close-moving: true
+      # A block action and an entity action in one client tick (1.21.2+).
+      check-block-and-entity: true
+      # Attacking, interacting, using or placing while paddling a boat (1.21.2+).
+      check-rowing: true
   # FastPlace: placements per client tick (tick-end clients 1.21.2+ only). Holding right-click places
   # every 4 ticks; long streaks, several placements per tick or more than 20/s are not human.
   fastplace:
@@ -903,6 +939,9 @@ checks:
       check-speed: true
       check-hover: true
       check-rise: true
+      # Packet sanity (Grim VehicleA/B/D/E/F): steering beyond +-0.98, steering without a vehicle,
+      # mount jumps without a jumping mount, paddles outside a boat or against the held keys.
+      check-input-packets: true
   # Mace: an attack right after a fake fall setup - a rise above max-rise within a few ticks, or a
   # drop faster than terminal velocity (teleport up and back down for the smash bonus). Experimental.
   mace:
@@ -981,6 +1020,25 @@ checks:
       snap-hold-ticks: 10
       snap-return-ratio: 0.15
       snap-return-degrees: 4.0
+  # Interact: entity interactions vanilla cannot send (Grim SelfInteract, InvalidInteractCursor,
+  # MultiInteractB).
+  interact:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 3.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: combat
+    options:
+      # Attacking, interacting with or spectating the own entity.
+      check-self: true
+      # "Interact at" hit point outside the target player's box.
+      check-cursor: true
+      # Two different "interact at" hit points in one client tick (1.21.2+). Experimental.
+      check-multi: true
   # SilentRotation: the sent rotation is not the camera's. Experimental.
   silentrotation:
     enabled: true
@@ -1057,6 +1115,18 @@ checks:
     profile: movement
     options:
       min-ticks: 3
+      # Grim SprintA: sprinting with 6 or less food (acknowledged by the client) without flight.
+      check-hunger: true
+      # Grim SprintD: starting to sprint while blind.
+      check-blindness: true
+      # Grim SprintE (1.21.2+): still sprinting while running head-on into a wall for wall-ticks.
+      check-wall: true
+      wall-ticks: 3
+      # Grim SprintF (1.21.4 clients only, like Grim): sprinting while gliding.
+      check-gliding: true
+      # Grim SprintG: sprinting in shallow water (feet in water, eyes above) without swimming.
+      check-water: true
+      water-ticks: 3
   # Elytra: while the server-acknowledged gliding pose is active and the player is in known free air,
   # hovering without movement or never descending for climb-ticks without a boost. Experimental.
   elytra:
@@ -1178,6 +1248,29 @@ checks:
     options:
       # Blocks tolerated beyond the interaction range.
       tolerance: 0.1
+  # Breaking: dig packets vanilla cannot send (Grim AirLiquidBreak, InvalidBreak, NoSwingBreak,
+  # PositionBreakA/B).
+  breaking:
+    enabled: true
+    buffer:
+      limit: 1.0
+      decay: 0.05
+      max: 4.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      # Digging air, water, lava, bubble columns or moving pistons.
+      check-air-liquid: true
+      # Block face id outside 0..5.
+      check-face: true
+      # Digging in a client tick without an arm swing (1.21.2+). Experimental.
+      check-no-swing: true
+      # Digging a face of a full cube that no eye position can see.
+      check-position: true
+      # An abort with a face that is not followed by a start on that face.
+      check-cancel-face: true
   # Nuker: digging several blocks per client tick (1.21.2+ clients) or blocks the look ray does not
   # touch (previous and current position/rotation, standing/sneaking/crawling eye, full cube grown by
   # view-expand, interaction range + view-margin).
