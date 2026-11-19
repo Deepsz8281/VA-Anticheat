@@ -1,6 +1,6 @@
 # Checks
 
-VA+ has 42 checks in five categories. The **id** is the key under `checks:` in `config.yml` and the
+VA+ has 44 checks in five categories. The **id** is the key under `checks:` in `config.yml` and the
 name used by `/ac debug`.
 
 Checks marked *experimental* are heuristic. Their alerts use the `alert-experimental` message, so
@@ -21,6 +21,7 @@ Default profile `movement`. Movement checks can set the player back.
 | `prediction` | Prediction | Sustained position error the engine cannot explain | experimental |
 | `nofall` | NoFall | On-ground claims that contradict the simulated ground state | |
 | `step` | Step | Rising more than step height or jump velocity in one tick | |
+| `fastladder` | FastLadder | Climbing ladders, vines or scaffolding faster than vanilla | |
 | `highjump` | HighJump | Jumping higher than the jump velocity allows (high jump, air jump) | |
 | `spider` | Spider | Climbing walls without a climbable block | experimental |
 | `jesus` | Jesus | Standing or walking on water or lava | experimental |
@@ -68,6 +69,7 @@ Default profile `world`.
 | Id | Name | Detects | Notes |
 |---|---|---|---|
 | `scaffold` | Scaffold | Placements against faces the eye cannot see, silent rotations while bridging | experimental |
+| `blockreach` | BlockReach | Digging blocks beyond the interaction range | |
 | `nuker` | Nuker | Several blocks per tick or blocks outside the crosshair | Multi signal 1.21.2+ |
 | `fastbreak` | FastBreak | Breaking blocks faster than vanilla allows | |
 | `fastplace` | FastPlace | Placing blocks faster than a vanilla client can click | |

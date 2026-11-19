@@ -77,7 +77,7 @@ The console should show lines like these:
 
 ```
 [VAPlus] Server platform: Paper ...
-[VAPlus] Enabled with 42 checks.
+[VAPlus] Enabled with 44 checks.
 ```
 
 If you see `PacketEvents is not available; disabling VAPlus.`, PacketEvents is missing or failed to
