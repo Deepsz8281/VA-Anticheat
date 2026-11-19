@@ -1110,6 +1110,25 @@ checks:
       max-stddev-ticks: 0.35
       # Hotbar + offhand SWAP equips this many client ticks apart, 0..3.
       pair-gap-ticks: 1
+  # Nuker: digging several blocks per client tick (1.21.2+ clients) or blocks the look ray does not
+  # touch (previous and current position/rotation, standing/sneaking/crawling eye, full cube grown by
+  # view-expand, interaction range + view-margin).
+  nuker:
+    enabled: true
+    buffer:
+      limit: 3.0
+      decay: 0.1
+      max: 8.0
+    vl-decay-per-minute: 4.0
+    alert-vl: 1.0
+    setback-vl: -1.0
+    profile: world
+    options:
+      check-multi: true
+      max-blocks-per-tick: 1
+      check-view: true
+      view-expand: 0.1
+      view-margin: 1.0
   # FastUse: item uses (throwables etc.) in every tick, several per tick or above a rate a human can
   # click. Eating/drinking/bows are server-ticked and not judged. Tick-end clients only.
   fastuse:

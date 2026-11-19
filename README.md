@@ -6,7 +6,7 @@ Built on [PacketEvents](https://github.com/retrooper/packetevents).
 ## Features
 
 - **Movement simulation** that replays vanilla physics per tick and flags what no legal input explains
-- **41 checks** in five categories, each with its own buffer, VL decay and punishment profile
+- **42 checks** in five categories, each with its own buffer, VL decay and punishment profile
 - **Anti health indicator**: hides health, absorption, equipment details and game modes of other
   entities from cheat clients
 - **Xray obfuscation**, setbacks, violation logs (SQLite or MySQL/MariaDB) and a profiler
@@ -19,7 +19,7 @@ Built on [PacketEvents](https://github.com/retrooper/packetevents).
 | Movement | Speed, Fly, Prediction, NoFall, Step, HighJump, Spider, Jesus, Phase, NoSlow, Sprint, Velocity, Elytra, Vehicle |
 | Combat | Reach, Hitbox, Killaura, Aim, SilentRotation, Triggerbot, Autoclicker, Criticals, Mace, ThroughWall, ESP |
 | Packet | BadPackets, Timer, Blink, Post, Crasher |
-| World | Scaffold, FastBreak, FastPlace, FastUse, GhostHand, Freecam, Xray |
+| World | Scaffold, Nuker, FastBreak, FastPlace, FastUse, GhostHand, Freecam, Xray |
 | Inventory | InventoryMove, ChestStealer, AutoArmor, AutoTotem |
 
 Every check can be tuned or disabled under `checks.<id>` in `config.yml`.

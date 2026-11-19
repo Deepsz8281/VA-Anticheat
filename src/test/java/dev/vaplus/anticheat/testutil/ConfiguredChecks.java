@@ -32,7 +32,8 @@ public final class ConfiguredChecks {
             dev.vaplus.anticheat.check.impl.packet.BlinkCheck.DESCRIPTOR,
             dev.vaplus.anticheat.check.impl.movement.SprintCheck.DESCRIPTOR,
             dev.vaplus.anticheat.check.impl.movement.HighJumpCheck.DESCRIPTOR,
-            dev.vaplus.anticheat.check.impl.combat.SilentRotationCheck.DESCRIPTOR);
+            dev.vaplus.anticheat.check.impl.combat.SilentRotationCheck.DESCRIPTOR,
+            dev.vaplus.anticheat.check.impl.world.NukerCheck.DESCRIPTOR);
 
     private ConfiguredChecks() {
     }
