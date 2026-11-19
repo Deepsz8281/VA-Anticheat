@@ -40,13 +40,21 @@ public final class MovementChecksModule implements AnticheatModule {
         context.registerCheck(NoFallCheck.DESCRIPTOR, NoFallCheck::new);
         context.registerCheck(PredictionCheck.DESCRIPTOR, PredictionCheck::new);
         context.registerCheck(NoSlowCheck.DESCRIPTOR, NoSlowCheck::new);
-        context.registerCheck(VelocityCheck.DESCRIPTOR, VelocityCheck::new);
         context.registerCheck(SprintCheck.DESCRIPTOR, SprintCheck::new);
         if (simulation == null) {
+            context.registerCheck(VelocityCheck.DESCRIPTOR, VelocityCheck::new);
             return;
         }
         ComponentKey<WorldMirror> worldKey = simulation.worldMirrorKey();
         ComponentKey<VelocityState> velocityKey = simulation.velocityKey();
+        context.registerCheck(VelocityCheck.DESCRIPTOR, player -> new VelocityCheck(player, worldKey, velocityKey));
+        // Runs before the engine consumes acknowledged velocities (VelocityCheck distance signal).
+        context.addMovementHook((player, update) -> {
+            VelocityCheck velocity = player.checks().get(VelocityCheck.class);
+            if (velocity != null) {
+                velocity.beforeSimulation();
+            }
+        });
         context.registerCheck(SpiderCheck.DESCRIPTOR, player -> new SpiderCheck(player, worldKey, velocityKey));
         context.registerCheck(PhaseCheck.DESCRIPTOR, player -> new PhaseCheck(player, worldKey));
         context.registerCheck(StepCheck.DESCRIPTOR, player -> new StepCheck(player, worldKey, velocityKey));

@@ -596,6 +596,14 @@ checks:
       threshold: 0.04
       # Velocities whose horizontal speed and |vertical| are both below this (blocks/tick) are not judged.
       min-velocity: 0.1
+      # Distance (anti-KB without the simulation): after an acknowledged knockback of at least
+      # kb-min-velocity blocks/tick, the player must travel kb-ratio of the vanilla lower bound along
+      # the knockback within kb-ticks client ticks. Bounds below kb-min-expected are not judged.
+      check-distance: true
+      kb-min-velocity: 0.2
+      kb-ticks: 3
+      kb-ratio: 0.5
+      kb-min-expected: 0.2
   # Scaffold: placements against a full-cube face the eye cannot see, or whose hit point is not on the
   # clicked face. Only judged when the target is a mirrored full opaque cube. Experimental.
   scaffold:

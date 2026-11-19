@@ -147,6 +147,12 @@ public final class VelocityState {
         return count;
     }
 
+    /** Handle of the entry (monotonic in send order). */
+    public long id(int index) {
+        check(index);
+        return ids[index];
+    }
+
     public Kind kind(int index) {
         check(index);
         return kinds[index];
