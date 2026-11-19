@@ -455,6 +455,39 @@ checks:
       check-held-slot: true
       # Upper bound of movement packets per second (vanilla sends 20).
       max-movement-packets-per-second: 60
+      # Grim-equivalent signals (letters = Grim's BadPackets check with the same idea).
+      # A: selecting the hotbar slot that is already selected.
+      check-duplicate-slot: true
+      # C: "leave bed" while not sleeping. Experimental.
+      check-sleep: true
+      # E: more than 19 movement packets in a row without a position (vanilla sends one every 20 ticks).
+      check-movement-reminder: true
+      # F/G: start sprinting/sneaking while already doing it, or stop while not doing it.
+      check-duplicate-sprint: true
+      check-duplicate-sneak: true
+      # H: block/item prediction sequence going backwards, or a dig cancel with a non-zero sequence (1.19+).
+      check-sequence: true
+      # I: claiming to fly while the server does not allow flight.
+      check-abilities: true
+      # J: use-item rotation different from the rotation of the same tick (1.21.2+ clients).
+      check-use-rotation: true
+      # K: spectating an entity outside spectator mode.
+      check-spectate: true
+      # M: respawn request while alive (end credits excused). Experimental.
+      check-respawn: true
+      # O: keep-alive answer with an id the server never sent.
+      check-keepalive: true
+      # Q: entity action for another entity, or an impossible horse jump boost.
+      check-entity-action: true
+      # R: answering latency markers for starvation-millis of client time without any position. Experimental.
+      check-position-starvation: true
+      starvation-millis: 2000
+      # V: a position that moved less than 0.0002 blocks before the 20-tick reminder (1.21.2+). Experimental.
+      check-slow-move: true
+      # X: two sprint state changes in one client tick (1.21.2+ clients).
+      check-input-actions: true
+      # Z: two player-input packets in one client tick (1.21.2+ clients).
+      check-duplicate-input: true
   # Game-speed hacks: every client tick advances a client clock by one tick length; a clock that
   # overtakes real time means the client ticks too fast. Lag only delays packets and never flags.
   # /tick rate changes are followed automatically.

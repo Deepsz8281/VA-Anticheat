@@ -56,7 +56,7 @@ Default profile `packet`.
 
 | Id | Name | Detects | Notes |
 |---|---|---|---|
-| `badpackets` | BadPackets | Impossible rotations, cursors, dig sequences and packet rates | |
+| `badpackets` | BadPackets | Impossible or duplicate packets: rotations, cursors, dig and prediction sequences, duplicate slot/sprint/sneak/input, missing position reminders, fake flight, spectate, respawn, keep-alive and entity-action abuse, position starvation (Grim A-Z equivalents, see config) | some signals 1.21.2+ |
 | `timer` | Timer | Client ticks faster than real time | |
 | `blink` | Blink | Movement packets held back and released in a burst | experimental |
 | `post` | Post | Attacks and interactions sent after the movement packet of the same tick | experimental, 1.21.2+ |

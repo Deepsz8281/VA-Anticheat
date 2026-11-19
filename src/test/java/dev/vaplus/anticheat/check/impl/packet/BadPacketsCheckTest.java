@@ -15,17 +15,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @DisplayName("BadPackets (cursors, dig sequences, poses)")
 class BadPacketsCheckTest {
 
-    private record Fixture(Harness harness, PlayerData player, BadPacketsCheck check) {
+    /** Like the vanilla client: every predicted action takes the next sequence; dig cancels carry 0. */
+    private record Fixture(Harness harness, PlayerData player, BadPacketsCheck check, int[] sequence) {
         void place(float cursorX, float cursorY, float cursorZ) {
             BlockInteraction interaction = new BlockInteraction();
             interaction.assignPlace(0, 64, 0, BlockFace.UP, cursorX, cursorY, cursorZ,
-                    InteractionHand.MAIN_HAND, 1, false, 0L);
+                    InteractionHand.MAIN_HAND, ++sequence[0], false, 0L);
             player.checks().dispatchInteraction(interaction);
         }
 
         void dig(BlockInteraction.Kind kind, int x, int y, int z) {
             BlockInteraction interaction = new BlockInteraction();
-            interaction.assignDig(kind, x, y, z, BlockFace.UP, 1, 0L);
+            int next = kind == BlockInteraction.Kind.DIG_CANCEL ? 0 : ++sequence[0];
+            interaction.assignDig(kind, x, y, z, BlockFace.UP, next, 0L);
             player.checks().dispatchInteraction(interaction);
         }
     }
@@ -35,7 +37,7 @@ class BadPacketsCheckTest {
                 .check(BadPacketsCheck.DESCRIPTOR, BadPacketsCheck::new)
                 .build();
         PlayerData player = harness.newPlayer();
-        return new Fixture(harness, player, player.checks().get(BadPacketsCheck.class));
+        return new Fixture(harness, player, player.checks().get(BadPacketsCheck.class), new int[1]);
     }
 
     @Test
