@@ -35,18 +35,19 @@ public final class MovementChecksModule implements AnticheatModule {
 
     @Override
     public void register(ModuleContext context) {
-        context.registerCheck(SpeedCheck.DESCRIPTOR, SpeedCheck::new);
         context.registerCheck(FlyCheck.DESCRIPTOR, FlyCheck::new);
         context.registerCheck(NoFallCheck.DESCRIPTOR, NoFallCheck::new);
         context.registerCheck(PredictionCheck.DESCRIPTOR, PredictionCheck::new);
         context.registerCheck(NoSlowCheck.DESCRIPTOR, NoSlowCheck::new);
         context.registerCheck(SprintCheck.DESCRIPTOR, SprintCheck::new);
         if (simulation == null) {
+            context.registerCheck(SpeedCheck.DESCRIPTOR, SpeedCheck::new);
             context.registerCheck(VelocityCheck.DESCRIPTOR, VelocityCheck::new);
             return;
         }
         ComponentKey<WorldMirror> worldKey = simulation.worldMirrorKey();
         ComponentKey<VelocityState> velocityKey = simulation.velocityKey();
+        context.registerCheck(SpeedCheck.DESCRIPTOR, player -> new SpeedCheck(player, worldKey, velocityKey));
         context.registerCheck(VelocityCheck.DESCRIPTOR, player -> new VelocityCheck(player, worldKey, velocityKey));
         // Runs before the engine consumes acknowledged velocities (VelocityCheck distance signal).
         context.addMovementHook((player, update) -> {

@@ -198,6 +198,10 @@ checks:
       threshold: 0.03
       # Do not count movement that is clearly slower than the prediction (unmodelled obstacles).
       ignore-slowdown: true
+      # Limit (no simulation needed, 1.21.2+ clients): one tick may not move further than
+      # previous distance x friction + acceleration + sprint-jump boost, x 1.02 + limit-tolerance.
+      check-limit: true
+      limit-tolerance: 0.04
   fly:
     enabled: true
     buffer:

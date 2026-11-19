@@ -68,7 +68,8 @@ class MovementCheckConfigTest {
         ConfigSnapshot snapshot = SettingsParser.parse(Configs.bundledConfig());
 
         CheckSettings speed = snapshot.resolve(SpeedCheck.DESCRIPTOR);
-        assertEquals(Set.of("threshold", "ignore-slowdown"), speed.options().keys());
+        assertEquals(Set.of("threshold", "ignore-slowdown", "check-limit", "limit-tolerance"), speed.options().keys());
+        assertEquals(SpeedCheck.DEFAULT_LIMIT_TOLERANCE, speed.options().getDouble("limit-tolerance", -1));
         assertEquals(SpeedCheck.DEFAULT_THRESHOLD, speed.options().getDouble("threshold", -1));
         assertTrue(speed.options().getBoolean("ignore-slowdown", false));
 
